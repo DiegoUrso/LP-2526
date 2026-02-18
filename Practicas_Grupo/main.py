@@ -3,7 +3,7 @@ import re
 import sys
 # from colorama import init  ## Para colorear la salida en la terminal
 # from termcolor import colored ## Para colorear la salida en la terminal
-init()
+#init()
 
 
 DIRECTORIO = os.path.expanduser("~/Repositorio/Docencia/Asignaturas/LP/Proyecto/")
@@ -23,7 +23,7 @@ TESTS = [fich for fich in FICHEROS
          if os.path.isfile(os.path.join(DIR, fich)) and
          re.search(r"^[a-zA-Z].*\.(cool|test|cl)$",fich)]
 TESTS.sort()
-TESTS = ["escapedunprintables.cool"]
+#TESTS = ["escapedunprintables.cool"]
 
 if True:
     for fich in TESTS:
@@ -52,8 +52,8 @@ if True:
                     linea = 0
                     while nuestro[linea:linea+NUMLINEAS] == bien[linea:linea+NUMLINEAS]:
                         linea += 1
-                    print(colored('\n'.join(nuestro[linea:linea+NUMLINEAS]), 'white', 'on_red'))
-                    print(colored('\n'.join(bien[linea:linea+NUMLINEAS]), 'blue', 'on_green'))
+                    #print(colored('\n'.join(nuestro[linea:linea+NUMLINEAS]), 'white', 'on_red'))
+                    #print(colored('\n'.join(bien[linea:linea+NUMLINEAS]), 'blue', 'on_green'))
                     f = open(os.path.join(DIR, fich)+'.nuestro', 'w')
                     g = open(os.path.join(DIR, fich)+'.bien', 'w')
                     f.write(texto.strip())
