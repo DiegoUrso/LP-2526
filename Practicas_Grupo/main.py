@@ -48,8 +48,8 @@ if True:
             bien = [linea.strip() for linea in resultado.split('\n') if linea.strip()]
             texto = '\n'.join(nuestro)
             resultado = '\n'.join(bien)
-            print(texto)
-            print(resultado)
+            #print(texto)
+            #print(resultado)
             if texto.strip().split() != resultado.strip().split():
                 print(f"Revisa el fichero {fich}")
                 if DEBUG:
