@@ -13,7 +13,7 @@ class Comentario(Lexer):
             self.nesting_level = 0
         return self.nesting_level
     
-    @_(r'\n|\r')
+    @_(r'\n|\r\n|\r')
     def LINEA(self, t):
         self.lineno += 1
     @_(r'(?<!\\)\(\*')
@@ -37,8 +37,15 @@ class StringLexer(Lexer):
             self.string_buffer = ''
         self.string_buffer += append
         return self.string_buffer
-    
-    @_(r'[^"\\]*(\n|\r)')
+
+    @_(r'.+\Z|\\(\n|\r\n|\r)\Z')
+    def EOF(self, t):
+        t.type = 'ERROR'
+        t.value = '"EOF in string constant"'
+        self.string(reset=True)
+        self.begin(CoolLexer)
+        return t
+    @_(r'[^"\\]*(\n|\r\n|\r)')
     def LINEBREAK(self, t):
         t.type = 'ERROR'
         if '\0' in t.value:
@@ -50,8 +57,8 @@ class StringLexer(Lexer):
         return t
     @_(r'[^"\\]+')
     def STR(self, t):
-        self.string(t.value)
-    @_(r'\\(\n|\r)')
+        self.string(t.value.encode('unicode_escape').decode('ascii'))
+    @_(r'\\(\n|\r\n|\r)')
     def ESCAPE_LINEA(self, t):
         self.string('\\n')
         self.lineno += 1
@@ -65,7 +72,7 @@ class StringLexer(Lexer):
     def STR_CONST(self, t):
         if '\0' in self.string():
             t.type = 'ERROR'
-            if re.search(r'\\\0', self.string()):
+            if re.search(r'\x00', self.string()):
                 t.value = '"String contains escaped null character."'
             else:
                 t.value = '"String contains null character."'
@@ -74,16 +81,15 @@ class StringLexer(Lexer):
         self.string(reset=True)
         self.begin(CoolLexer)
         return t
-    
-    ## TODO: EOF case
         
 class CoolLexer(Lexer):
     tokens = {OBJECTID, INT_CONST, BOOL_CONST, TYPEID,
               ELSE, IF, FI, THEN, NOT, IN, CASE, ESAC, CLASS,
               INHERITS, ISVOID, LET, LOOP, NEW, OF,
               POOL, THEN, WHILE, STR_CONST, LE, DARROW, ASSIGN}
-    ignore = '\t \n'
-    literals = {'.', '{', '}', '(', ')', ':', ';', ',', '+', '-', '*', '~', '<', '>', '=', '/', '@'}
+    ignore = '\t \n\r'
+    literals = {'.', '{', '}', '(', ')', ':', ';', ',', '+', '-', '*', '~', '<', '=', '/', '@'}
+    invisibles = {chr(i) for i in range(32)} | {chr(127)}
     IF = r'\b[iI][fF]\b'
     FI = r'\b[fF][iI]\b'
     THEN = r'\b[tT][hH][eE][nN]\b'
@@ -113,12 +119,11 @@ class CoolLexer(Lexer):
         t.value = t.value.lower() == 'true'
         return t
     
-    @_(r'0|[1-9][0-9]*')
+    @_(r'[0-9]+')
     def INT_CONST(self, t):
-        t.value = int(t.value)
         return t
     
-    @_(r'\n|\r')
+    @_(r'\n|\r\n|\r')
     def LINEBREAK(self, t):
         self.lineno += 1
     
@@ -149,8 +154,12 @@ class CoolLexer(Lexer):
             t.type = t.value
         elif t.value == "*)":
             t.value = f'"Unmatched *)"'
+        elif t.value in self.invisibles:
+            octal_value = f"\\{ord(t.value):03o}"
+            t.value = f'"{octal_value}"'
         else:
-            t.value = f'"{t.value}"'
+            escaped_value = t.value.replace('\\', '\\\\').replace('"', '\\"')
+            t.value = f'"{escaped_value}"'
         return t
 
     def error(self, t):
