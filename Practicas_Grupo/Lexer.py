@@ -36,12 +36,12 @@ class Comentario(Lexer):
             self.nesting_level = 1
             self.begin(CoolLexer)
     @_(r'\r?\n')
-    def LINEA(self, t):
+    def LINEBREAK(self, t):
         self.lineno += 1
     @_(r'.')
-    def PASAR(self, t):
+    def SKIP(self, t):
         pass
-class StringLexer(Lexer):
+class String(Lexer):
     tokens = {STR_CONST, ERROR}
     
     def count(self, n = 0):
@@ -91,22 +91,17 @@ class StringLexer(Lexer):
         self.string(t.value.encode('unicode_escape').decode('ascii'))
         self.count(len(t.value))
     @_(r'\\\r?\n')
-    def ESCAPE_LINEA(self, t):
+    def ESCAPE_LINEBREAK(self, t):
         self.string('\\n')
         self.count(1)
         self.lineno += 1
     @_(r'\\.')
     def ESCAPE(self, t):
-        if t.value[1] in ['n', 't', 'f', 'b', '\\', '"']:
-            self.string(t.value)
-        elif t.value[1] == '\t':
-            self.string('\\t')
-        elif t.value[1] == '\b':
-            self.string('\\b')
-        elif t.value[1] == '\f':
-            self.string('\\f')
-        else:
-            self.string(t.value[1])
+        if t.value[1] in ['n', 't', 'f', 'b', '\\', '"']: self.string(t.value)
+        elif t.value[1] == '\t': self.string('\\t')
+        elif t.value[1] == '\b': self.string('\\b')
+        elif t.value[1] == '\f': self.string('\\f')
+        else: self.string(t.value[1])
         self.count(1)
     @_(r'"')
     def STR_CONST(self, t):
@@ -114,25 +109,19 @@ class StringLexer(Lexer):
             t.type = 'ERROR'
             t.value = '"String constant too long"'
         else:
-            t.value = f'"{self.string()}"' # TODO: Buscar mejor forma.
+            t.value = f'"{self.string()}"'
         self.string(reset=True)
         self.begin(CoolLexer)
         return t
     @_(r'.')
     def CHAR(self, t):
         # Special handling for control characters
-        if t.value == '\r':
-            self.string('\\015')
-        elif t.value == '\x1b':
-            self.string('\\033')
-        elif t.value == '\v':
-            self.string('\\013')
-        elif t.value == '\x0c':
-            self.string('\\f')
-        elif t.value == '\x12':
-            self.string('\\022')
-        else:
-            self.string(t.value)
+        if t.value == '\r': self.string('\\015')
+        elif t.value == '\x1b': self.string('\\033')
+        elif t.value == '\v': self.string('\\013')
+        elif t.value == '\x0c': self.string('\\f')
+        elif t.value == '\x12': self.string('\\022')
+        else: self.string(t.value)
         self.count(1)
         
 class CoolLexer(Lexer):
@@ -167,7 +156,7 @@ class CoolLexer(Lexer):
     
     @_(r'"')
     def STR_CONST(self, t):
-        self.begin(StringLexer)
+        self.begin(String)
     
     @_(r'\bt[rR][uU][eE]\b|\bf[aA][lL][sS][eE]\b')
     def BOOL_CONST(self, t):
@@ -186,13 +175,9 @@ class CoolLexer(Lexer):
     def TYPEID(self, t):
         return t
     
-    @_(r'\(\*')
-    def IR(self, t):
-        self.begin(Comentario)
-        
-    @_(r'--.*')
-    def COMENTARIO(self, t):
-        pass
+    @_(r'\(\*|--.*')
+    def COMMENT(self, t):
+        if t.value == '(*': self.begin(Comentario)
     
     @_(r'\*\)|.')
     def ERROR(self, t):
