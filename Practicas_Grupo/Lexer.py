@@ -13,7 +13,7 @@ class Comentario(Lexer):
             self.nesting_level = 0
         return self.nesting_level
     
-    @_(r'\n')
+    @_(r'\n|\r')
     def LINEA(self, t):
         self.lineno += 1
     @_(r'(?<!\\)\(\*')
@@ -38,7 +38,7 @@ class StringLexer(Lexer):
         self.string_buffer += append
         return self.string_buffer
     
-    @_(r'[^"\\]*\n')
+    @_(r'[^"\\]*(\n|\r)')
     def LINEBREAK(self, t):
         t.type = 'ERROR'
         if '\0' in t.value:
@@ -51,7 +51,7 @@ class StringLexer(Lexer):
     @_(r'[^"\\]+')
     def STR(self, t):
         self.string(t.value)
-    @_(r'\\\n')
+    @_(r'\\(\n|\r)')
     def ESCAPE_LINEA(self, t):
         self.string('\\n')
         self.lineno += 1
@@ -118,7 +118,7 @@ class CoolLexer(Lexer):
         t.value = int(t.value)
         return t
     
-    @_(r'\n')
+    @_(r'\n|\r')
     def LINEBREAK(self, t):
         self.lineno += 1
     
