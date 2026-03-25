@@ -172,6 +172,7 @@ class RamaCase(Nodo):
 class Swicht(Nodo):
     expr: Expresion = None
     casos: List[RamaCase] = field(default_factory=list)
+    cast: str = '_no_type'
 
     def str(self, n):
         resultado = super().str(n)
@@ -184,6 +185,8 @@ class Swicht(Nodo):
 @dataclass
 class Nueva(Nodo):
     tipo: str = '_no_set'
+    cast: str = '_no_type'
+    
     def str(self, n):
         resultado = super().str(n)
         resultado += f'{(n)*" "}_new\n'
