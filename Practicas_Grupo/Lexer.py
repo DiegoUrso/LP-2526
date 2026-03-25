@@ -129,7 +129,7 @@ class CoolLexer(Lexer):
               ELSE, IF, FI, THEN, NOT, IN, CASE, ESAC, CLASS,
               INHERITS, ISVOID, LET, LOOP, NEW, OF,
               POOL, THEN, WHILE, STR_CONST, LE, DARROW, ASSIGN}
-    ignore = '\t \n\r\f\v'
+    ignore = '\t \r\f\v'
     literals = {'.', '{', '}', '(', ')', ':', ';', ',', '+', '-', '*', '~', '<', '=', '/', '@'}
     invisibles = {chr(i) for i in range(32)} | {chr(127)}
     INT_CONST = r'[0-9]+'
