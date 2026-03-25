@@ -69,8 +69,15 @@ class CoolParser(Parser):
         return Asignacion(nombre=p.OBJECTID, cuerpo=p.expr)
     
     precedence = (
+        ('right', 'ASSIGN'),
+        ('right', 'NOT'),
+        ('nonassoc', '<', 'LE', '='),
         ('left', '+', '-'),
         ('left', '*', '/'),
+        ('right', 'ISVOID'),
+        ('right', '~'),
+        ('left', '@'),
+        ('left', '.'),
     )
 
     @_("expr '+' expr")
@@ -150,15 +157,21 @@ class CoolParser(Parser):
         elif len(p) == 8: # With ASSIGN expr, without lista_let
             return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=p.expr1)
         elif len(p) == 7: # Without ASSIGN expr, with lista_let
-            temp = Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=NoExpr(), cuerpo=p.expr)
-            for name, type, init in p.lista_let:
-                temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp)
-            return temp
+            temp = Let()
+            for i, (name, type, init) in enumerate(reversed(p.lista_let)):
+                if i == 0:
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=p.expr)
+                else:
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp)
+            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=NoExpr(), cuerpo=temp)
         elif len(p) == 9: # With ASSIGN expr, with lista_let
-            temp = Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=p.expr1)
-            for name, type, init in p.lista_let:
-                temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp)
-            return temp
+            temp = Let()
+            for i, (name, type, init) in enumerate(reversed(p.lista_let)):
+                if i == 0:
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=p.expr1)
+                else:
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp)
+            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=temp)
 
     @_("let_item", "let_item lista_let")
     def lista_let(self, p):
@@ -168,13 +181,13 @@ class CoolParser(Parser):
     def let_item(self, p):
         return (p.OBJECTID, p.TYPEID, p.expr) if hasattr(p, 'expr') else (p.OBJECTID, p.TYPEID, NoExpr())
 
-    @_("CASE expr OF esac_list ';' ESAC")
+    @_("CASE expr OF esac_list ESAC")
     def expr(self, p):
         return Swicht(expr=p.expr, casos=p.esac_list)
     
-    @_("OBJECTID ':' TYPEID DARROW expr", "OBJECTID ':' TYPEID DARROW expr esac_list")
+    @_("OBJECTID ':' TYPEID DARROW expr ';'", "OBJECTID ':' TYPEID DARROW expr ';' esac_list")
     def esac_list(self, p):
-        return [(p.OBJECTID, p.TYPEID, p.expr)] if not hasattr(p, 'esac_list') else [(p.OBJECTID, p.TYPEID, p.expr)] + p.esac_list
+        return [RamaCase(nombre_variable=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)] if not hasattr(p, 'esac_list') else [RamaCase(nombre_variable=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)] + p.esac_list
         
     @_("NEW TYPEID")
     def expr(self, p):
@@ -203,3 +216,15 @@ class CoolParser(Parser):
     @_("BOOL_CONST")
     def expr(self, p):
         return Booleano(valor=p.BOOL_CONST)
+    
+    def error(self, p):
+        if p:
+            if p.type in ('TYPEID', 'OBJECTID', 'INT_CONST', 'STR_CONST', 'BOOL_CONST'):
+                source = f"{p.type} = {p.value}"
+            elif p.type == p.value:
+                source = f"'{p.type}'"
+            else:
+                source = p.type
+            self.errores.append(f"\"{self.nombre_fichero}\", line {p.lineno}: syntax error at or near {source}")
+        else:
+            self.errores.append(f"\"{self.nombre_fichero}\", line 0: syntax error at or near EOF")
