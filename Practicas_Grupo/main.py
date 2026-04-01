@@ -23,7 +23,7 @@ TESTS = [fich for fich in FICHEROS
          if os.path.isfile(os.path.join(DIR, fich)) and
          re.search(r"^[a-zA-Z].*\.(cool|test|cl)$",fich)]
 TESTS.sort()
-#TESTS = ["escapedunprintables.cool"]
+#TESTS = ["secondbindingerrored.test"]
 
 if True:
     for fich in TESTS:
@@ -85,8 +85,8 @@ if True:
                             linea += 1
                         print(colored('\n'.join(nuestro[linea:linea+NUMLINEAS]), 'white', 'on_red'))
                         print(colored('\n'.join(bien[linea:linea+NUMLINEAS]), 'blue', 'on_green'))
-                        f = open(os.path.join(DIR, fich)+'.nuestro', 'w')
-                        g = open(os.path.join(DIR, fich)+'.bien', 'w')
+                        f = open(os.path.join(DIR, fich)+'.nuestro', 'w')   #Los errores de nuestro resultado actual en rojo
+                        g = open(os.path.join(DIR, fich)+'.bien', 'w')      #Los errores del resultado esperado en verde
                         f.write(resultado.strip())
                         g.write(bien_total.strip())
                         f.close()

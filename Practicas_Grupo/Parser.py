@@ -6,7 +6,6 @@ import sys
 import os
 from Clases import *
 
-
 class CoolParser(Parser):
     nombre_fichero = ''
     tokens = CoolLexer.tokens
@@ -177,7 +176,7 @@ class CoolParser(Parser):
     def lista_let(self, p):
         return [p.let_item] if not hasattr(p, 'lista_let') else [p.let_item] + p.lista_let
     
-    @_("',' OBJECTID : TYPEID", "',' OBJECTID ':' TYPEID ASSIGN expr")
+    @_("',' OBJECTID : TYPEID", "',' OBJECTID ':' TYPEID ASSIGN expr", "error ',' OBJECTID ':' TYPEID", "error , OBJECTID ':' TYPEID ASSIGN expr")
     def let_item(self, p):
         return (p.OBJECTID, p.TYPEID, p.expr) if hasattr(p, 'expr') else (p.OBJECTID, p.TYPEID, NoExpr())
 
@@ -218,6 +217,7 @@ class CoolParser(Parser):
         return Booleano(valor=p.BOOL_CONST)
     
     def error(self, p):
+        #print(p)
         if p:
             if p.type in ('TYPEID', 'OBJECTID', 'INT_CONST', 'STR_CONST', 'BOOL_CONST'):
                 source = f"{p.type} = {p.value}"
@@ -228,3 +228,9 @@ class CoolParser(Parser):
             self.errores.append(f"\"{self.nombre_fichero}\", line {p.lineno}: syntax error at or near {source}")
         else:
             self.errores.append(f"\"{self.nombre_fichero}\", line 0: syntax error at or near EOF")
+        
+        #print(self.errores)
+
+    #def errok(self):
+    #    '''Redefinición de la función que limpia el registro de errores'''
+    #    self.errorok = False
