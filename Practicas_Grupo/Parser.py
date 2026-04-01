@@ -196,7 +196,7 @@ class CoolParser(Parser):
     def expr(self, p):
         return Bloque(expresiones=p.bloque_exprs)
     
-    @_("expr ';'", "expr ';' bloque_exprs")
+    @_("expr ';'", "expr ';' bloque_exprs", "expr ';' error ';' bloque_exprs")
     def bloque_exprs(self, p):
         return [p.expr] if not hasattr(p, 'bloque_exprs') else [p.expr] + p.bloque_exprs
     
