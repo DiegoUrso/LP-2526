@@ -51,9 +51,9 @@ class CoolParser(Parser):
         else:
             return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=NoExpr())
     
-    @_("OBJECTID '(' ')' ':' TYPEID '{' expr '}' ';'", "OBJECTID '(' lista_formales ')' ':' TYPEID '{' expr '}' ';'")
+    @_("OBJECTID '(' ')' ':' TYPEID '{' expr '}' ';'", "OBJECTID '(' lista_formales ')' ':' TYPEID '{' expr '}' ';'", "OBJECTID '(' ')' ':' TYPEID '{' error '}' ';'", "OBJECTID '(' lista_formales ')' ':' TYPEID '{' error '}' ';'")
     def metodo(self, p):
-        return Metodo(nombre=p.OBJECTID, formales=p.lista_formales if hasattr(p, 'lista_formales') else [], tipo=p.TYPEID, cuerpo=p.expr)
+        return Metodo(nombre=p.OBJECTID, formales=p.lista_formales if hasattr(p, 'lista_formales') else [], tipo=p.TYPEID, cuerpo=p.expr if hasattr(p, 'expr') else NoExpr())
     
     @_("formal", "formal ',' lista_formales")
     def lista_formales(self, p):
