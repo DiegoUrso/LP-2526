@@ -44,14 +44,23 @@ class CoolParser(Parser):
         else:
             return p.serie_atr_met + [p.metodo]
         
-    @_("OBJECTID ':' TYPEID ';'", "OBJECTID ':' TYPEID ASSIGN expr ';'")
+    @_("OBJECTID ':' TYPEID ';'", 
+       "OBJECTID ':' TYPEID ASSIGN expr ';'", 
+       "OBJECTID ':' error ';'")
     def atributo(self, p):
-        if hasattr(p, 'expr'):
-            return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)
+        if hasattr(p, 'TYPEID'):
+            if hasattr(p, 'expr'):
+                return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)
+            else:
+                return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=NoExpr())
         else:
-            return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=NoExpr())
-    
-    @_("OBJECTID '(' ')' ':' TYPEID '{' expr '}' ';'", "OBJECTID '(' lista_formales ')' ':' TYPEID '{' expr '}' ';'", "OBJECTID '(' ')' ':' TYPEID '{' error '}' ';'", "OBJECTID '(' lista_formales ')' ':' TYPEID '{' error '}' ';'")
+            return NoExpr()
+
+    @_("OBJECTID '(' ')' ':' TYPEID '{' expr '}' ';'", 
+       "OBJECTID '(' lista_formales ')' ':' TYPEID '{' expr '}' ';'", 
+       "OBJECTID '(' ')' ':' TYPEID '{' error '}' ';'", 
+       "OBJECTID '(' lista_formales ')' ':' TYPEID '{' error '}' ';'"
+       )
     def metodo(self, p):
         return Metodo(nombre=p.OBJECTID, formales=p.lista_formales if hasattr(p, 'lista_formales') else [], tipo=p.TYPEID, cuerpo=p.expr if hasattr(p, 'expr') else NoExpr())
     
