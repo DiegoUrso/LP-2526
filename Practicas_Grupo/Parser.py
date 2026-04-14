@@ -64,7 +64,7 @@ class CoolParser(Parser):
     def metodo(self, p):
         return Metodo(nombre=p.OBJECTID, formales=p.lista_formales if hasattr(p, 'lista_formales') else [], tipo=p.TYPEID, cuerpo=p.expr if hasattr(p, 'expr') else NoExpr())
     
-    @_("formal", "formal ',' lista_formales")
+    @_("formal", "formal ',' lista_formales", "formal error lista_formales")
     def lista_formales(self, p):
         return [p.formal] if not hasattr(p, 'lista_formales') else [p.formal] + p.lista_formales
     
