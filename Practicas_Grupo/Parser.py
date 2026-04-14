@@ -189,9 +189,10 @@ class CoolParser(Parser):
     def let_item(self, p):
         return (p.OBJECTID, p.TYPEID, p.expr) if hasattr(p, 'expr') else (p.OBJECTID, p.TYPEID, NoExpr())
 
-    @_("CASE expr OF esac_list ESAC")
+    @_("CASE expr OF esac_list ESAC", "CASE error OF esac_list ESAC")
     def expr(self, p):
-        return Swicht(expr=p.expr, casos=p.esac_list)
+        if hasattr(p, 'expr'):
+            return Swicht(expr=p.expr, casos=p.esac_list)
     
     @_("OBJECTID ':' TYPEID DARROW expr ';'", "OBJECTID ':' TYPEID DARROW expr ';' esac_list")
     def esac_list(self, p):
