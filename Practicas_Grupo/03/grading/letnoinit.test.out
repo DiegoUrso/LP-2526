@@ -1,32 +1,28 @@
-#4
+#5
 _program
-  #4
+  #5
   _class
-    Test
-    Object
+    Main
+    IO
     "letnoinit.test"
     (
-    #2
-    _attr
-      foo
-      Test
-      #2
-      _no_expr
-      : _no_type
-    #3
+    #4
     _method
-      baz
-      String
-      #3
-      _let
-        x
-        Int
+      main
+      Object
+      #4
+      _block
         #3
-        _no_expr
-        : _no_type
-        #3
-        _object
+        _let
           x
-        : _no_type
-      : _no_type
+          Int
+          #3
+          _no_expr
+          : _no_type
+          #3
+          _object
+            x
+          : Int
+        : Int
+      : Int
     )
