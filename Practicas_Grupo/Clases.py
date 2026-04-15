@@ -1,7 +1,32 @@
 # coding: utf-8
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
+class Ambito:
+    def __init__(self):
+        self.variables: dict[str, str] = {}
+    
+    def get_tipo_variable(self, nombre: str) -> Optional[str]:
+        if nombre in self.variables:
+            return self.variables[nombre]
+        else:
+            return None
+    
+    def es_subtipo(self, tipo1: Optional[str], tipo2: Optional[str]) -> bool:
+        if tipo1 is None or tipo2 is None:
+            return False
+        if tipo1 == tipo2:
+            return True
+        elif tipo1 == 'Object':
+            return True
+        elif tipo1 == 'Int' and tipo2 == 'Object':
+            return True
+        elif tipo1 == 'String' and tipo2 == 'Object':
+            return True
+        elif tipo1 == 'Bool' and tipo2 == 'Object':
+            return True
+        else:
+            return False
 
 @dataclass
 class Nodo:
@@ -25,6 +50,9 @@ class Formal(Nodo):
 
 class Expresion(Nodo):
     cast: str = '_no_type'
+    
+    def Tipo(self, ambito: Ambito):
+        pass
 
 
 @dataclass
@@ -39,7 +67,7 @@ class Asignacion(Expresion):
         resultado += self.cuerpo.str(n+2)
         resultado += f'{(n)*" "}: {self.cast}\n'
         return resultado
-    def Tipo(self, ambito):
+    def Tipo(self, ambito: Ambito):
         self.cuerpo.Tipo(ambito)
         if ambito.es_subtipo(ambito.get_tipo_variable(self.nombre), self.cuerpo.cast):
             self.cast = self.cuerpo.cast
@@ -150,6 +178,14 @@ class Bloque(Expresion):
         resultado += f'{(n)*" "}: {self.cast}\n'
         resultado += '\n'
         return resultado
+    
+    def Tipo(self, ambito: Ambito):
+        for expr in self.expresiones:
+            expr.Tipo(ambito)
+        if self.expresiones:
+            self.cast = self.expresiones[-1].cast
+        else:
+            self.cast = 'Object'
 
 
 @dataclass
@@ -192,6 +228,9 @@ class Nueva(Nodo):
         resultado += f'{(n+2)*" "}{self.tipo}\n'
         resultado += f'{(n)*" "}: {self.cast}\n'
         return resultado
+    
+    def Tipo(self, ambito):
+        self.cast = self.tipo
 
 
 
@@ -340,9 +379,6 @@ class EsNulo(Expresion):
         resultado += f'{(n)*" "}: {self.cast}\n'
         return resultado
 
-
-
-
 @dataclass
 class Objeto(Expresion):
     nombre: str = '_no_set'
@@ -355,7 +391,7 @@ class Objeto(Expresion):
         return resultado
 
     def Tipo(self, ambito):
-        self.cast = ambito.dame_tipo_variable(self.nombre)
+        self.cast = ambito.get_tipo_variable(self.nombre) or 'Object'
 
 @dataclass
 class NoExpr(Expresion):
@@ -423,6 +459,8 @@ class Programa(IterableNodo):
 
     def Tipo(self):
         ambito = Ambito()
+        for clase in self.secuencia:
+            clase.Tipo(ambito)
 
 @dataclass
 class Caracteristica(Nodo):
@@ -430,6 +468,8 @@ class Caracteristica(Nodo):
     tipo: str = '_no_set'
     cuerpo: Expresion = None
 
+    def Tipo(self, ambito: Ambito):
+        pass
 
 @dataclass
 class Clase(Nodo):
@@ -449,6 +489,11 @@ class Clase(Nodo):
         resultado += '\n'
         resultado += f'{(n+2)*" "})\n'
         return resultado
+    
+    def Tipo(self, ambito: Ambito):
+        print(f"Analizando clase {self.nombre} en el fichero {self.nombre_fichero}. Características con su clase: {[(c.nombre, type(c).__name__) for c in self.caracteristicas]}")
+        for caracteristica in self.caracteristicas:
+            caracteristica.Tipo(ambito)
 
 @dataclass
 class Metodo(Caracteristica):
@@ -463,6 +508,12 @@ class Metodo(Caracteristica):
         resultado += self.cuerpo.str(n+2)
 
         return resultado
+    
+    def Tipo(self, ambito: Ambito):
+        for formal in self.formales:
+            formal.Tipo(ambito)
+        self.cuerpo.Tipo(ambito)
+        print(f"Analizando método {self.nombre} de tipo {self.tipo} con cuerpo {self.cuerpo} del tipo {self.cuerpo.cast}")
 
 
 class Atributo(Caracteristica):
@@ -474,3 +525,8 @@ class Atributo(Caracteristica):
         resultado += f'{(n+2)*" "}{self.tipo}\n'
         resultado += self.cuerpo.str(n+2)
         return resultado
+    
+    def Tipo(self, ambito: Ambito):
+        self.cuerpo.Tipo(ambito)
+        ambito.variables[self.nombre] = self.tipo
+        print(f"Analizando atributo {self.nombre} de tipo {self.tipo} con cuerpo {self.cuerpo} del tipo {self.cuerpo.cast}")
