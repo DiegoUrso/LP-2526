@@ -1,11 +1,13 @@
 # coding: utf-8
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-errores = []
+errores_sem = []
 
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
+    ambitos: List['Ambito'] = []
     
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
@@ -58,6 +60,18 @@ class Ambito:
             return True
         else:
             return False
+
+    def entrar_ambito(self):
+        nuevo_ambito = deepcopy(Ambito(padre=self))
+        self.ambitos.append(nuevo_ambito)
+        return nuevo_ambito
+
+    def salir_ambito(self):
+        if self.ambitos:
+            return self.ambitos.pop()
+        else:
+            return None
+
 
 @dataclass
 class Nodo:
@@ -235,12 +249,13 @@ class Let(Expresion):
     
     def Tipo(self, ambito: Ambito):
         #print(f"Analizando let {self.nombre} de tipo {self.tipo} con inicialización {self.inicializacion} en el ámbito actual. Variables disponibles: {ambito.variables}. Cuerpo {self.cuerpo} con tipo {self.cuerpo.cast}")
-        ambito_let = Ambito(padre=ambito)
+        ambito_let = ambito.entrar_ambito()
         self.inicializacion.Tipo(ambito_let)
         #if ambito_let.es_subtipo(self.inicializacion.cast, self.tipo):
         ambito_let.variables[self.nombre] = self.tipo
         self.cuerpo.Tipo(ambito_let)
         self.cast = self.cuerpo.cast
+        ambito.salir_ambito()
         
 
 
@@ -518,7 +533,10 @@ class Objeto(Expresion):
 
     def Tipo(self, ambito):
         #print(f"Analizando objeto {self.nombre} en el ámbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
-        self.cast = ambito.get_tipo_variable(self.nombre) or 'SELF_TYPE'
+        if  ambito.get_tipo_variable(self.nombre) is None:
+            errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
+        else:
+            self.cast = ambito.get_tipo_variable(self.nombre)
 
 @dataclass
 class NoExpr(Expresion):
@@ -658,10 +676,11 @@ class Metodo(Caracteristica):
         return resultado
     
     def Tipo(self, ambito: Ambito):
-        ambito_m = Ambito(padre=ambito)
+        ambito_m = ambito.entrar_ambito()
         for formal in self.formales:
             formal.Tipo(ambito_m)
         self.cuerpo.Tipo(ambito_m)
+        ambito.salir_ambito()
 
 
 class Atributo(Caracteristica):

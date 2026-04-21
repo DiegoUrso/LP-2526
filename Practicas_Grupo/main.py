@@ -12,7 +12,7 @@ sys.path.append(DIRECTORIO)
 from Lexer import *
 from Parser import *
 from Clases import *
-from Clases import errores as error_clases
+from Clases import errores_sem as error_clases
 
 
 PRACTICA = "03" # Practica que hay que evaluar
@@ -25,7 +25,7 @@ TESTS = [fich for fich in FICHEROS
          if os.path.isfile(os.path.join(DIR, fich)) and
          re.search(r"^[a-zA-Z].*\.(cool|test|cl)$",fich)]
 TESTS.sort()
-#TESTS = ["escapedunprintables.cool"]
+#TESTS = ["outofscope.test"]
 
 if True:
     for fich in TESTS:
@@ -75,11 +75,12 @@ if True:
                     resultado = '\n'.join([c for c in j.str(0).split('\n')
                                            if c and '#' not in c])
                 else:
-                    resultado = '\n'.join(parser.errores + error_clases)
+                    resultado = '\n'.join(parser.errores + [f"{fich}:{linea}" for linea in error_clases])
                     if error_clases and not parser.errores:
                         resultado += '\n' + "Compilation halted due to static semantic errors."
                     else:
                         resultado += '\n' + "Compilation halted due to lex and parse errors"
+                    error_clases.clear()
                 if resultado.lower().strip().split() != bien.lower().strip().split():
                     print(f"Revisa el fichero {fich}")
                     if DEBUG:

@@ -212,7 +212,7 @@ class CoolParser(Parser):
     
     @_("OBJECTID")
     def expr(self, p):
-        return Objeto(nombre=p.OBJECTID)
+        return Objeto(linea=p.lineno, nombre=p.OBJECTID)
     
     @_("INT_CONST")
     def expr(self, p):
