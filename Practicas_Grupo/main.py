@@ -15,7 +15,7 @@ from Clases import *
 
 PRACTICA = "03" # Practica que hay que evaluar
 DEBUG = True   # Decir si se lanzan mensajes de debug
-NUMLINEAS = 3   # Numero de lineas que se muestran antes y después de la no coincidencia
+NUMLINEAS = 5   # Numero de lineas que se muestran antes y después de la no coincidencia
 sys.path.append(DIRECTORIO)
 DIR = os.path.join(DIRECTORIO, PRACTICA, 'grading')
 FICHEROS = os.listdir(DIR)
@@ -68,7 +68,7 @@ if True:
             g.close()
             j = parser.parse(lexer.tokenize(entrada))
             try:
-                #j.Tipo()
+                j.Tipo()
                 if j and not parser.errores:
                     resultado = '\n'.join([c for c in j.str(0).split('\n')
                                            if c and '#' not in c])
