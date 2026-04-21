@@ -2,6 +2,8 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+errores = []
+
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
     
