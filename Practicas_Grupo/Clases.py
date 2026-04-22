@@ -115,13 +115,25 @@ class Asignacion(Expresion):
         resultado += self.cuerpo.str(n+2)
         resultado += f'{(n)*" "}: {self.cast}\n'
         return resultado
+    
     def Tipo(self, ambito: Ambito):
         self.cuerpo.Tipo(ambito)
-        if ambito.es_subtipo(ambito.get_tipo_variable(self.nombre), self.cuerpo.cast):
-            self.cast = self.cuerpo.cast
-        else:
-            self.cast = 'Object'
-        ambito.add_variable(self.nombre, self.cast)
+
+        tipo_var = ambito.get_tipo_variable(self.nombre)
+        tipo_expr = self.cuerpo.cast
+
+        # si la variable no existe
+        if tipo_var is None:
+            errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
+            self.cast = tipo_expr
+            return
+
+        if not ambito.es_subtipo(tipo_expr, tipo_var):
+            errores_sem.append(
+                f"{self.linea}: Type {tipo_expr} of assigned expression does not conform to declared type {tipo_var} of identifier {self.nombre}."
+            )
+
+        self.cast = tipo_expr
 
 
 @dataclass
@@ -696,7 +708,6 @@ class Atributo(Caracteristica):
         return resultado
     
     def Tipo(self, ambito: Ambito):
-        # 🔴 ERROR: self no puede ser nombre de atributo
         if self.nombre == "self":
             errores_sem.append(f"{self.linea}: 'self' cannot be the name of an attribute.")
             return

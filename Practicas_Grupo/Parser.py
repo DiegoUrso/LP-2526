@@ -15,13 +15,13 @@ class CoolParser(Parser):
     @_("Clase", "Clase Programa")
     def Programa(self, p):
         if hasattr(p, 'Programa'):
-            return Programa(secuencia=[p.Clase] + p.Programa.secuencia)
+            return Programa(secuencia=[p.Clase] + p.Programa.secuencia, linea=p.lineno)
         else:
-            return Programa(secuencia=[p.Clase])
+            return Programa(secuencia=[p.Clase], linea=p.lineno)
     
     @_("CLASS TYPEID hereda '{' serie_atr_met '}' ';'") 
     def Clase(self, p):
-        return Clase(nombre=p.TYPEID, padre=p.hereda, caracteristicas=p.serie_atr_met, nombre_fichero=self.nombre_fichero)
+        return Clase(nombre=p.TYPEID, padre=p.hereda, caracteristicas=p.serie_atr_met, nombre_fichero=self.nombre_fichero, linea=p.lineno)
 
     @_("", "INHERITS TYPEID")
     def hereda(self, p):
@@ -45,26 +45,16 @@ class CoolParser(Parser):
             return p.serie_atr_met + [p.metodo]
         
     @_("OBJECTID ':' TYPEID ';'", 
-   "OBJECTID ':' TYPEID ASSIGN expr ';'", 
-   "OBJECTID ':' error ';'")
+       "OBJECTID ':' TYPEID ASSIGN expr ';'", 
+       "OBJECTID ':' error ';'")
     def atributo(self, p):
         if hasattr(p, 'TYPEID'):
             if hasattr(p, 'expr'):
-                return Atributo(
-                    nombre=p.OBJECTID,
-                    tipo=p.TYPEID,
-                    cuerpo=p.expr,
-                    linea=p.lineno  
-                )
+                return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr, linea=p.lineno)
             else:
-                return Atributo(
-                    nombre=p.OBJECTID,
-                    tipo=p.TYPEID,
-                    cuerpo=NoExpr(),
-                    linea=p.lineno  
-                )
+                return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=NoExpr(), linea=p.lineno)
         else:
-            return NoExpr()
+            return NoExpr(linea=p.lineno)
 
     @_("OBJECTID '(' ')' ':' TYPEID '{' expr '}' ';'", 
        "OBJECTID '(' lista_formales ')' ':' TYPEID '{' expr '}' ';'", 
@@ -72,7 +62,7 @@ class CoolParser(Parser):
        "OBJECTID '(' lista_formales ')' ':' TYPEID '{' error '}' ';'"
        )
     def metodo(self, p):
-        return Metodo(nombre=p.OBJECTID, formales=p.lista_formales if hasattr(p, 'lista_formales') else [], tipo=p.TYPEID, cuerpo=p.expr if hasattr(p, 'expr') else NoExpr())
+        return Metodo(nombre=p.OBJECTID, formales=p.lista_formales if hasattr(p, 'lista_formales') else [], tipo=p.TYPEID, cuerpo=p.expr if hasattr(p, 'expr') else NoExpr(), linea=p.lineno)
     
     @_("formal", "formal ',' lista_formales", "formal error lista_formales")
     def lista_formales(self, p):
@@ -80,11 +70,11 @@ class CoolParser(Parser):
     
     @_("OBJECTID ':' TYPEID")
     def formal(self, p):
-        return Formal(nombre_variable=p.OBJECTID, tipo=p.TYPEID)
+        return Formal(nombre_variable=p.OBJECTID, tipo=p.TYPEID, linea=p.lineno)
     
     @_("OBJECTID ASSIGN expr")
     def expr(self, p):
-        return Asignacion(nombre=p.OBJECTID, cuerpo=p.expr)
+        return Asignacion(nombre=p.OBJECTID, cuerpo=p.expr, linea=p.lineno)
     
     precedence = (
         ('right', 'ASSIGN'),
@@ -100,31 +90,31 @@ class CoolParser(Parser):
 
     @_("expr '+' expr")
     def expr(self, p):
-        return Suma(izquierda=p.expr0, derecha=p.expr1)
+        return Suma(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)
 
     @_("expr '-' expr")
     def expr(self, p):
-        return Resta(izquierda=p.expr0, derecha=p.expr1)
+        return Resta(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)
 
     @_("expr '*' expr")
     def expr(self, p):
-        return Multiplicacion(izquierda=p.expr0, derecha=p.expr1)
+        return Multiplicacion(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)
 
     @_("expr '/' expr")
     def expr(self, p):
-        return Division(izquierda=p.expr0, derecha=p.expr1)    
+        return Division(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)    
     
     @_("expr '<' expr")
     def expr(self, p):
-        return Menor(izquierda=p.expr0, derecha=p.expr1)
+        return Menor(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)
     
     @_("expr LE expr")
     def expr(self, p):
-        return LeIgual(izquierda=p.expr0, derecha=p.expr1)
+        return LeIgual(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)
     
     @_("expr '=' expr")
     def expr(self, p):
-        return Igual(izquierda=p.expr0, derecha=p.expr1)
+        return Igual(izquierda=p.expr0, derecha=p.expr1, linea=p.lineno)
     
     @_("'(' expr ')'")
     def expr(self, p):
@@ -132,26 +122,26 @@ class CoolParser(Parser):
     
     @_("NOT expr")
     def expr(self, p):
-        return Not(expr=p.expr)
+        return Not(expr=p.expr, linea=p.lineno)
     
     @_("ISVOID expr")
     def expr(self, p):
-        return EsNulo(expr=p.expr)
+        return EsNulo(expr=p.expr, linea=p.lineno)
     
     @_("'~' expr")
     def expr(self, p):
-        return Neg(expr=p.expr)
+        return Neg(expr=p.expr, linea=p.lineno)
     
     @_("expr '@' TYPEID '.' OBJECTID '(' ')'", "expr '@' TYPEID '.' OBJECTID '(' lista_exprs ')'")
     def expr(self, p):
-        return LlamadaMetodoEstatico(cuerpo=p.expr, clase=p.TYPEID, nombre_metodo=p.OBJECTID, argumentos=p.lista_exprs if hasattr(p, 'lista_exprs') else [])
+        return LlamadaMetodoEstatico(cuerpo=p.expr, clase=p.TYPEID, nombre_metodo=p.OBJECTID, argumentos=p.lista_exprs if hasattr(p, 'lista_exprs') else [], linea=p.lineno)
     
     @_("expr '.' OBJECTID '(' ')'", "expr '.' OBJECTID '(' lista_exprs ')'", "OBJECTID '(' ')'","OBJECTID '(' lista_exprs ')'")
     def expr(self, p):
         if hasattr(p, 'expr'):
-            return LlamadaMetodo(cuerpo=p.expr, nombre_metodo=p.OBJECTID, argumentos=p.lista_exprs if hasattr(p, 'lista_exprs') else [])
+            return LlamadaMetodo(cuerpo=p.expr, nombre_metodo=p.OBJECTID, argumentos=p.lista_exprs if hasattr(p, 'lista_exprs') else [], linea=p.lineno)
         else:
-            return LlamadaMetodo(cuerpo=Objeto(nombre='self'), nombre_metodo=p.OBJECTID, argumentos=p.lista_exprs if hasattr(p, 'lista_exprs') else [])
+            return LlamadaMetodo(cuerpo=Objeto(nombre='self', linea=p.lineno), nombre_metodo=p.OBJECTID, argumentos=p.lista_exprs if hasattr(p, 'lista_exprs') else [], linea=p.lineno)
         
     @_("expr", "expr ',' lista_exprs")
     def lista_exprs(self, p):
@@ -159,37 +149,37 @@ class CoolParser(Parser):
     
     @_("IF expr THEN expr ELSE expr FI")
     def expr(self, p):
-        return Condicional(condicion=p.expr0, verdadero=p.expr1, falso=p.expr2)
+        return Condicional(condicion=p.expr0, verdadero=p.expr1, falso=p.expr2, linea=p.lineno)
     
     @_("WHILE expr LOOP expr POOL")
     def expr(self, p):
-        return Bucle(condicion=p.expr0, cuerpo=p.expr1)
+        return Bucle(condicion=p.expr0, cuerpo=p.expr1, linea=p.lineno)
     
     @_("LET OBJECTID ':' TYPEID IN expr",
        "LET OBJECTID ':' TYPEID ASSIGN expr IN expr",
        "LET OBJECTID ':' TYPEID lista_let IN expr",
        "LET OBJECTID ':' TYPEID ASSIGN expr lista_let IN expr")
     def expr(self, p):
-        if len(p) == 6: # Without ASSIGN expr, without lista_let
-            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=NoExpr(), cuerpo=p.expr)
-        elif len(p) == 8: # With ASSIGN expr, without lista_let
-            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=p.expr1)
-        elif len(p) == 7: # Without ASSIGN expr, with lista_let
+        if len(p) == 6:
+            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=NoExpr(), cuerpo=p.expr, linea=p.lineno)
+        elif len(p) == 8:
+            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=p.expr1, linea=p.lineno)
+        elif len(p) == 7:
             temp = Let()
             for i, (name, type, init) in enumerate(reversed(p.lista_let)):
                 if i == 0:
-                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=p.expr)
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=p.expr, linea=p.lineno)
                 else:
-                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp)
-            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=NoExpr(), cuerpo=temp)
-        elif len(p) == 9: # With ASSIGN expr, with lista_let
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp, linea=p.lineno)
+            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=NoExpr(), cuerpo=temp, linea=p.lineno)
+        elif len(p) == 9:
             temp = Let()
             for i, (name, type, init) in enumerate(reversed(p.lista_let)):
                 if i == 0:
-                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=p.expr1)
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=p.expr1, linea=p.lineno)
                 else:
-                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp)
-            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=temp)
+                    temp = Let(nombre=name, tipo=type, inicializacion=init, cuerpo=temp, linea=p.lineno)
+            return Let(nombre=p.OBJECTID, tipo=p.TYPEID, inicializacion=p.expr0, cuerpo=temp, linea=p.lineno)
 
     @_("let_item", "let_item lista_let")
     def lista_let(self, p):
@@ -202,19 +192,19 @@ class CoolParser(Parser):
     @_("CASE expr OF esac_list ESAC", "CASE error OF esac_list ESAC")
     def expr(self, p):
         if hasattr(p, 'expr'):
-            return Swicht(expr=p.expr, casos=p.esac_list)
+            return Swicht(expr=p.expr, casos=p.esac_list, linea=p.lineno)
     
     @_("OBJECTID ':' TYPEID DARROW expr ';'", "OBJECTID ':' TYPEID DARROW expr ';' esac_list")
     def esac_list(self, p):
-        return [RamaCase(nombre_variable=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)] if not hasattr(p, 'esac_list') else [RamaCase(nombre_variable=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)] + p.esac_list
+        return [RamaCase(nombre_variable=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr, linea=p.lineno)] if not hasattr(p, 'esac_list') else [RamaCase(nombre_variable=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr, linea=p.lineno)] + p.esac_list
         
     @_("NEW TYPEID")
     def expr(self, p):
-        return Nueva(tipo=p.TYPEID)
+        return Nueva(tipo=p.TYPEID, linea=p.lineno)
     
     @_("'{' bloque_exprs '}'")
     def expr(self, p):
-        return Bloque(expresiones=p.bloque_exprs)
+        return Bloque(expresiones=p.bloque_exprs, linea=p.lineno)
     
     @_("expr ';'", "expr ';' bloque_exprs", "expr ';' error ';' bloque_exprs")
     def bloque_exprs(self, p):
@@ -222,22 +212,21 @@ class CoolParser(Parser):
     
     @_("OBJECTID")
     def expr(self, p):
-        return Objeto(linea=p.lineno, nombre=p.OBJECTID)
+        return Objeto(nombre=p.OBJECTID, linea=p.lineno)
     
     @_("INT_CONST")
     def expr(self, p):
-        return Entero(valor=p.INT_CONST)
+        return Entero(valor=p.INT_CONST, linea=p.lineno)
     
     @_("STR_CONST")
     def expr(self, p):
-        return String(valor=p.STR_CONST)
+        return String(valor=p.STR_CONST, linea=p.lineno)
     
     @_("BOOL_CONST")
     def expr(self, p):
-        return Booleano(valor=p.BOOL_CONST)
+        return Booleano(valor=p.BOOL_CONST, linea=p.lineno)
     
     def error(self, p):
-        #print(p)
         if p:
             if p.type in ('TYPEID', 'OBJECTID', 'INT_CONST', 'STR_CONST', 'BOOL_CONST'):
                 source = f"{p.type} = {p.value}"
@@ -248,9 +237,3 @@ class CoolParser(Parser):
             self.errores.append(f"\"{self.nombre_fichero}\", line {p.lineno}: syntax error at or near {source}")
         else:
             self.errores.append(f"\"{self.nombre_fichero}\", line 0: syntax error at or near EOF")
-        
-        #print(self.errores)
-
-    #def errok(self):
-    #    '''Redefinición de la función que limpia el registro de errores'''
-    #    self.errorok = False
