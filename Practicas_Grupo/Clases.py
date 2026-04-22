@@ -204,6 +204,20 @@ class LlamadaMetodo(Expresion):
             metodo = ambito.get_metodo(self.nombre_metodo)
         else:
             metodo = clase.get_metodo(self.nombre_metodo)
+
+        if metodo is not None:
+            if len(metodo.formales) == len(self.argumentos):
+                for formal, arg in zip(metodo.formales, self.argumentos):
+                    arg_tipo = arg.cast
+                    formal_tipo = formal.tipo
+
+                    if not ambito.es_subtipo(arg_tipo, formal_tipo):
+                        errores_sem.append(
+                            f"{self.linea}: In call of method {self.nombre_metodo}, "
+                            f"type {arg_tipo} of parameter {formal.nombre_variable} "
+                            f"does not conform to declared type {formal_tipo}."
+                        )
+            
         if metodo is None or metodo.tipo == 'SELF_TYPE':
             self.cast = self.cuerpo.cast
         else:
