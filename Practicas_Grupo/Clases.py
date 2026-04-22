@@ -712,5 +712,14 @@ class Atributo(Caracteristica):
             errores_sem.append(f"{self.linea}: 'self' cannot be the name of an attribute.")
             return
 
+        padre = ambito.padre
+        while padre:
+            if self.nombre in padre.variables:
+                errores_sem.append(
+                    f"{self.linea}: Attribute {self.nombre} is an attribute of an inherited class."
+                )
+                break
+            padre = padre.padre
+
         self.cuerpo.Tipo(ambito)
         ambito.add_variable(self.nombre, self.tipo)
