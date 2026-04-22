@@ -391,14 +391,19 @@ class OperacionBinaria(Expresion):
 class Suma(OperacionBinaria):
     operando: str = '+'
 
-    def str(self, n):
-        resultado = super().str(n)
-        resultado += f'{(n)*" "}_plus\n'
-        resultado += self.izquierda.str(n+2)
-        resultado += self.derecha.str(n+2)
-        resultado += f'{(n)*" "}: {self.cast}\n'
-        return resultado
+    def Tipo(self, ambito):
+        self.izquierda.Tipo(ambito)
+        self.derecha.Tipo(ambito)
 
+        tipo_izq = self.izquierda.cast
+        tipo_der = self.derecha.cast
+
+        if tipo_izq != 'Int' or tipo_der != 'Int':
+            errores_sem.append(
+                f"{self.linea}: non-Int arguments: {tipo_izq} + {tipo_der}"
+            )
+
+        self.cast = 'Int'  # en Cool, + siempre devuelve Int si es válido
 
 @dataclass
 class Resta(OperacionBinaria):
