@@ -8,12 +8,35 @@ errores_sem = []
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
     ambitos: List['Ambito'] = []
-    
+    arbol_clases: dict[str, 'Clase'] = {}
+    clases_por_nombre: dict[str, 'Clase'] = {}
+    lista_metodos: dict['Clase', 'Metodo'] = {}
+
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
         self.variables: dict[str, str] = {}
         self.metodos: dict[str, Metodo] = {}
         
+    def registrar_clase(self, nombre: str, clase: 'Clase'):
+        Ambito.clases_por_nombre[nombre] = clase
+
+    def anhadir_clase_arbol(self, clase, padre):
+        Ambito.arbol_clases[clase.nombre] = padre
+        cars_padre: dict[str, 'Caracteristica'] = {}
+
+        if padre != 'Object':
+            for c in self.clases_por_nombre.get(padre, Clase()).caracteristicas:
+                cars_padre[c.nombre] = c
+            for caracteristica in clase.caracteristicas:
+                if isinstance(caracteristica, Metodo):
+                    self.add_metodo(caracteristica.nombre, caracteristica)
+                    if caracteristica.nombre in cars_padre:
+                        car_padre = cars_padre[caracteristica.nombre]
+                        for formal in caracteristica.formales:
+                            for f in car_padre.formales:
+                                if formal.nombre_variable == f.nombre_variable and formal.tipo != f.tipo:
+                                    errores_sem.append(f"{caracteristica.linea}: In redefined method {caracteristica.nombre}, parameter type {formal.tipo} is different from original type {f.tipo}")
+
     def get_ambito_clase(self, nombre: str) -> Optional['Ambito']:
         if nombre in Ambito.clases:
             return Ambito.clases[nombre]
@@ -391,6 +414,14 @@ class OperacionBinaria(Expresion):
 class Suma(OperacionBinaria):
     operando: str = '+'
 
+    def str(self, n):
+        resultado = super().str(n)
+        resultado += f'{(n)*" "}_plus\n'
+        resultado += self.izquierda.str(n+2)
+        resultado += self.derecha.str(n+2)
+        resultado += f'{(n)*" "}: {self.cast}\n'
+        return resultado
+
     def Tipo(self, ambito):
         self.izquierda.Tipo(ambito)
         self.derecha.Tipo(ambito)
@@ -644,6 +675,9 @@ class Programa(IterableNodo):
         ambito.add_metodo('type_name', Metodo(nombre='type_name', tipo='String'))
         ambito.add_metodo('copy', Metodo(nombre='copy', tipo='SELF_TYPE'))
         ambito.add_metodo('length', Metodo(nombre='length', tipo='Int'))
+        for clase in self.secuencia:
+            ambito.anhadir_clase_arbol(clase, clase.padre)
+            ambito.registrar_clase(clase.nombre, clase)
         for clase in self.secuencia:
             clase.Tipo(ambito)
         for clase in self.secuencia:
