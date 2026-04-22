@@ -45,14 +45,24 @@ class CoolParser(Parser):
             return p.serie_atr_met + [p.metodo]
         
     @_("OBJECTID ':' TYPEID ';'", 
-       "OBJECTID ':' TYPEID ASSIGN expr ';'", 
-       "OBJECTID ':' error ';'")
+   "OBJECTID ':' TYPEID ASSIGN expr ';'", 
+   "OBJECTID ':' error ';'")
     def atributo(self, p):
         if hasattr(p, 'TYPEID'):
             if hasattr(p, 'expr'):
-                return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=p.expr)
+                return Atributo(
+                    nombre=p.OBJECTID,
+                    tipo=p.TYPEID,
+                    cuerpo=p.expr,
+                    linea=p.lineno  
+                )
             else:
-                return Atributo(nombre=p.OBJECTID, tipo=p.TYPEID, cuerpo=NoExpr())
+                return Atributo(
+                    nombre=p.OBJECTID,
+                    tipo=p.TYPEID,
+                    cuerpo=NoExpr(),
+                    linea=p.lineno  
+                )
         else:
             return NoExpr()
 

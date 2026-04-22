@@ -694,7 +694,10 @@ class Atributo(Caracteristica):
         return resultado
     
     def Tipo(self, ambito: Ambito):
+        # 🔴 ERROR: self no puede ser nombre de atributo
+        if self.nombre == "self":
+            errores_sem.append(f"{self.linea}: 'self' cannot be the name of an attribute.")
+            return
+
         self.cuerpo.Tipo(ambito)
         ambito.add_variable(self.nombre, self.tipo)
-        #print(f"ambito actual: {ambito.variables}")
-        #print(f"Analizando atributo {self.nombre} de tipo {self.tipo} con cuerpo {self.cuerpo} del tipo {self.cuerpo.cast}")
