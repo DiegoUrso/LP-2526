@@ -533,8 +533,10 @@ class Objeto(Expresion):
 
     def Tipo(self, ambito):
         #print(f"Analizando objeto {self.nombre} en el ámbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
-        if  ambito.get_tipo_variable(self.nombre) is None:
+        if ambito.get_tipo_variable(self.nombre) is None and self.nombre != 'self':
             errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
+        elif self.nombre == 'self':
+            self.cast = 'SELF_TYPE'
         else:
             self.cast = ambito.get_tipo_variable(self.nombre)
 
