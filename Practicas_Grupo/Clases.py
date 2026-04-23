@@ -5,6 +5,12 @@ from typing import List, Optional
 
 errores_sem = []
 
+CLASES_BASICAS = {"Object", "Int", "Bool", "String"}
+
+def add_error(msg):
+    if msg not in errores_sem:
+        errores_sem.append(msg)
+
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
     ambitos: List['Ambito'] = []
@@ -18,7 +24,19 @@ class Ambito:
         self.metodos: dict[str, Metodo] = {}
         
     def registrar_clase(self, nombre: str, clase: 'Clase'):
-        Ambito.clases_por_nombre[nombre] = clase
+        #print("DEBUG:", clase.nombre, clase.linea)
+        if nombre in CLASES_BASICAS:
+            errores_sem.append(
+                f"{clase.linea + 1}: Redefinition of basic class {nombre}."
+            )
+            return
+
+        if nombre in Ambito.clases_por_nombre:
+            errores_sem.append(
+                f"{clase.linea + 1}: Class {nombre} was previously defined."
+            )
+        else:
+            Ambito.clases_por_nombre[nombre] = clase
 
     def anhadir_clase_arbol(self, clase, padre):
         Ambito.arbol_clases[clase.nombre] = padre
@@ -115,8 +133,16 @@ class Formal(Nodo):
         resultado += f'{(n+2)*" "}{self.tipo}\n'
         return resultado
     def Tipo(self, ambito: Ambito):
-        ambito.add_variable(self.nombre_variable, self.tipo)
-        #print(f"Analizando formal {self.nombre_variable} de tipo {self.tipo} en el ámbito actual. Variables disponibles: {ambito.variables}")
+        if self.nombre_variable == 'self':
+            errores_sem.append(
+                f"{self.linea}: 'self' cannot be the name of a formal parameter."
+            )
+        if self.nombre_variable in ambito.variables:
+            errores_sem.append(
+                f"{self.linea}: Formal parameter {self.nombre_variable} is multiply defined."
+            )
+        else:
+            ambito.add_variable(self.nombre_variable, self.tipo)
 
 
 class Expresion(Nodo):
@@ -219,34 +245,54 @@ class LlamadaMetodo(Expresion):
             exit()
             
     def Tipo(self, ambito: Ambito):
+
+        if getattr(self, "_visited", False):
+            return
+        self._visited = True
+
         for arg in self.argumentos:
-            arg.Tipo(ambito)
+            if arg.cast == '_no_type':
+                arg.Tipo(ambito)
+
         self.cuerpo.Tipo(ambito)
-        clase = ambito.get_ambito_clase(self.cuerpo.cast)
-        if clase is None:
-            metodo = ambito.get_metodo(self.nombre_metodo)
+
+        metodo = None
+        if self.cuerpo is None:
+            clase_nombre = ambito.tipo_clase_actual
+        elif self.cuerpo.cast == 'SELF_TYPE':
+            clase_nombre = ambito.tipo_clase_actual
         else:
-            metodo = clase.get_metodo(self.nombre_metodo)
+            clase_nombre = self.cuerpo.cast
 
-        if metodo is not None:
-            if len(metodo.formales) == len(self.argumentos):
-                for formal, arg in zip(metodo.formales, self.argumentos):
-                    arg_tipo = arg.cast
-                    formal_tipo = formal.tipo
+        while clase_nombre is not None and metodo is None:
+            clase = Ambito.clases_por_nombre.get(clase_nombre)
+            if clase:
+                metodo = clase.get_metodo(self.nombre_metodo)
+                clase_nombre = Ambito.arbol_clases.get(clase_nombre)
+            else:
+                break
 
-                    if not ambito.es_subtipo(arg_tipo, formal_tipo):
-                        errores_sem.append(
-                            f"{self.linea}: In call of method {self.nombre_metodo}, "
-                            f"type {arg_tipo} of parameter {formal.nombre_variable} "
-                            f"does not conform to declared type {formal_tipo}."
-                        )
-            
-        if metodo is None or metodo.tipo == 'SELF_TYPE':
+        if metodo is None:
+            add_error(
+                f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
+            )
+            self.cast = 'Object'
+            return
+
+        if len(metodo.formales) == len(self.argumentos) and not hasattr(self, "_checked_args"):
+            self._checked_args = True
+            for formal, arg in zip(metodo.formales, self.argumentos):
+                if not ambito.es_subtipo(arg.cast, formal.tipo):
+                    add_error(
+                        f"{self.linea}: In call of method {self.nombre_metodo}, "
+                        f"type {arg.cast} of parameter {formal.nombre_variable} "
+                        f"does not conform to declared type {formal.tipo}."
+                    )
+
+        if metodo.tipo == 'SELF_TYPE':
             self.cast = self.cuerpo.cast
         else:
             self.cast = metodo.tipo
-        #print(metodo, self.cuerpo.cast, self.nombre_metodo, self.cast)
-        #print(f"Analizando llamada a método {self.nombre_metodo} con cuerpo {self.cuerpo} del tipo {self.cuerpo.cast}. El tipo resultante es {self.cast}")
         
 
 @dataclass
@@ -277,6 +323,16 @@ class Bucle(Expresion):
         resultado += self.cuerpo.str(n+2)
         resultado += f'{(n)*" "}: {self.cast}\n'
         return resultado
+    def Tipo(self, ambito: Ambito):
+        self.condicion.Tipo(ambito)
+        self.cuerpo.Tipo(ambito)
+
+        if self.condicion.cast != 'Bool':
+            errores_sem.append(
+                f"{self.linea}: Loop condition does not have type Bool."
+            )
+
+        self.cast = 'Object'
 
 
 @dataclass
@@ -297,14 +353,22 @@ class Let(Expresion):
         return resultado
     
     def Tipo(self, ambito: Ambito):
-        #print(f"Analizando let {self.nombre} de tipo {self.tipo} con inicialización {self.inicializacion} en el ámbito actual. Variables disponibles: {ambito.variables}. Cuerpo {self.cuerpo} con tipo {self.cuerpo.cast}")
-        ambito_let = ambito.entrar_ambito()
+        ambito_let = Ambito(padre=ambito)
+
         self.inicializacion.Tipo(ambito_let)
-        #if ambito_let.es_subtipo(self.inicializacion.cast, self.tipo):
-        ambito_let.variables[self.nombre] = self.tipo
+
+        # 🔴 CHECK IMPORTANTE (ESTO ES LO QUE TE FALTA)
+        if self.inicializacion.cast != '_no_type' and self.tipo != '_no_set':
+            if not ambito.es_subtipo(self.inicializacion.cast, self.tipo):
+                errores_sem.append(
+                    f"{self.linea}: Inferred type {self.inicializacion.cast} of initialization of {self.nombre} does not conform to declared type {self.tipo}."
+                )
+
+        ambito_let.add_variable(self.nombre, self.tipo)
+
         self.cuerpo.Tipo(ambito_let)
+
         self.cast = self.cuerpo.cast
-        ambito.salir_ambito()
         
 
 
@@ -364,7 +428,15 @@ class Swicht(Nodo):
         return resultado
     def Tipo(self, ambito: Ambito):
         self.expr.Tipo(ambito)
+        tipos_vistos = set()
         for caso in self.casos:
+            if caso.tipo in tipos_vistos:
+                errores_sem.append(
+                    f"{caso.linea}: Duplicate branch {caso.tipo} in case statement."
+                )
+            else:
+                tipos_vistos.add(caso.tipo)
+
             caso.Tipo(ambito)
         tipos_casos = [caso.cuerpo.cast for caso in self.casos]
         if tipos_casos:
@@ -392,6 +464,10 @@ class Nueva(Nodo):
         return resultado
     
     def Tipo(self, ambito):
+        if self.tipo not in Ambito.clases_por_nombre and self.tipo not in CLASES_BASICAS:
+            errores_sem.append(
+                f"{self.linea}: 'new' used with undefined class {self.tipo}."
+            )
         self.cast = self.tipo
 
 
@@ -532,6 +608,17 @@ class Igual(OperacionBinaria):
     def Tipo(self, ambito):
         self.izquierda.Tipo(ambito)
         self.derecha.Tipo(ambito)
+
+        tipo_izq = self.izquierda.cast
+        tipo_der = self.derecha.cast
+
+        tipos_basicos = ['Int', 'Bool', 'String']
+
+        if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
+            errores_sem.append(
+                f"{self.linea}: Illegal comparison with a basic type."
+            )
+
         self.cast = 'Bool'
 
 @dataclass
@@ -670,14 +757,26 @@ class Programa(IterableNodo):
 
     def Tipo(self):
         Ambito.clases = {}
+        Ambito.clases_por_nombre = {}
+        Ambito.arbol_clases = {}
+
         ambito = Ambito()
         ambito.add_metodo('abort', Metodo(nombre='abort', tipo='Object'))
         ambito.add_metodo('type_name', Metodo(nombre='type_name', tipo='String'))
         ambito.add_metodo('copy', Metodo(nombre='copy', tipo='SELF_TYPE'))
         ambito.add_metodo('length', Metodo(nombre='length', tipo='Int'))
+
+        for clase in self.secuencia:
+            if clase.nombre in CLASES_BASICAS:
+                add_error(
+                    f"{clase.linea}: Redefinition of basic class {clase.nombre}."
+                )
+            else:
+                ambito.registrar_clase(clase.nombre, clase)
+
         for clase in self.secuencia:
             ambito.anhadir_clase_arbol(clase, clase.padre)
-            ambito.registrar_clase(clase.nombre, clase)
+
         for clase in self.secuencia:
             clase.Tipo(ambito)
         for clase in self.secuencia:
@@ -719,6 +818,7 @@ class Clase(Nodo):
         if ambito_class is None:
             raise Exception(f"Clase padre {self.padre} no encontrada para la clase {self.nombre} en el fichero {self.nombre_fichero}")
         self.new_ambito = Ambito(padre=ambito_class)
+        self.new_ambito.tipo_clase_actual = self.nombre
         for caracteristica in self.caracteristicas:
             if isinstance(caracteristica, Metodo):
                 self.new_ambito.add_metodo(caracteristica.nombre, caracteristica)
@@ -744,8 +844,15 @@ class Metodo(Caracteristica):
     
     def Tipo(self, ambito: Ambito):
         ambito_m = ambito.entrar_ambito()
+
         for formal in self.formales:
             formal.Tipo(ambito_m)
+
+        ambito_m.add_metodo(self.nombre, self)
+        if self.tipo not in Ambito.clases_por_nombre and self.tipo not in CLASES_BASICAS:
+            errores_sem.append(
+                f"{self.linea}: Undefined return type {self.tipo} in method {self.nombre}."
+            )
         self.cuerpo.Tipo(ambito_m)
         ambito.salir_ambito()
 
