@@ -6,6 +6,7 @@ from typing import List, Optional
 errores_sem = []
 
 CLASES_BASICAS = {"Object", "Int", "Bool", "String"}
+METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 def add_error(msg):
     if msg not in errores_sem:
@@ -16,7 +17,7 @@ class Ambito:
     ambitos: List['Ambito'] = []
     arbol_clases: dict[str, 'Clase'] = {}
     clases_por_nombre: dict[str, 'Clase'] = {}
-    lista_metodos: dict['Clase', 'Metodo'] = {}
+    lista_metodos: dict['Clase', 'Metodo'] = {} #TODO: Creo que esta variable no es necesaria (Dani).
 
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
@@ -272,7 +273,12 @@ class LlamadaMetodo(Expresion):
             else:
                 break
 
-        if metodo is None:
+        if clase_nombre in CLASES_BASICAS:
+            if self.nombre_metodo in METODOS_BASICOS:
+                #TODO: Puede requerir actualizar el tipo para los demás métodos básicos en el futuro (Dani)
+                metodo = Metodo(nombre=self.nombre_metodo, tipo='int' if self.nombre_metodo == 'length' 
+                                else 'SELF_TYPE', formales=[])
+        elif metodo is None:
             add_error(
                 f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
             )
@@ -361,7 +367,7 @@ class Let(Expresion):
         if self.inicializacion.cast != '_no_type' and self.tipo != '_no_set':
             if not ambito.es_subtipo(self.inicializacion.cast, self.tipo):
                 errores_sem.append(
-                    f"{self.linea}: Inferred type {self.inicializacion.cast} of initialization of {self.nombre} does not conform to declared type {self.tipo}."
+                    f"{self.linea}: Inferred type {self.inicializacion.cast} of initialization of {self.nombre} does not conform to identifier's declared type {self.tipo}."
                 )
 
         ambito_let.add_variable(self.nombre, self.tipo)
@@ -756,6 +762,7 @@ class Programa(IterableNodo):
         return resultado
 
     def Tipo(self):
+        #TODO: Creo que estas trés asignaciones pueden quitarse (Dani).
         Ambito.clases = {}
         Ambito.clases_por_nombre = {}
         Ambito.arbol_clases = {}
