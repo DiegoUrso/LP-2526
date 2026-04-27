@@ -15,9 +15,8 @@ def add_error(msg):
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
     ambitos: List['Ambito'] = []
-    arbol_clases: dict[str, 'Clase'] = {}
+    arbol_herencias: dict[str, 'Clase'] = {}
     clases_por_nombre: dict[str, 'Clase'] = {}
-    lista_metodos: dict['Clase', 'Metodo'] = {} #TODO: Creo que esta variable no es necesaria (Dani).
 
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
@@ -40,7 +39,7 @@ class Ambito:
             Ambito.clases_por_nombre[nombre] = clase
 
     def anhadir_clase_arbol(self, clase, padre):
-        Ambito.arbol_clases[clase.nombre] = padre
+        Ambito.arbol_herencias[clase.nombre] = padre
         cars_padre: dict[str, 'Caracteristica'] = {}
 
         if padre != 'Object':
@@ -269,7 +268,7 @@ class LlamadaMetodo(Expresion):
             clase = Ambito.clases_por_nombre.get(clase_nombre)
             if clase:
                 metodo = clase.get_metodo(self.nombre_metodo)
-                clase_nombre = Ambito.arbol_clases.get(clase_nombre)
+                clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
             else:
                 break
 
@@ -369,6 +368,10 @@ class Let(Expresion):
                 errores_sem.append(
                     f"{self.linea}: Inferred type {self.inicializacion.cast} of initialization of {self.nombre} does not conform to identifier's declared type {self.tipo}."
                 )
+        if self.nombre == 'self':
+            errores_sem.append(
+                f"{self.linea}: 'self' cannot be bound in a 'let' expression."
+            )
 
         ambito_let.add_variable(self.nombre, self.tipo)
 
@@ -744,8 +747,10 @@ class Booleano(Expresion):
         resultado += f'{(n+2)*" "}{1 if self.valor else 0}\n'
         resultado += f'{(n)*" "}: {self.cast}\n'
         return resultado
+    
     def valor(self, ambito):
         return self.valor
+    
     def Tipo(self, ambito):
         self.cast = 'Bool'
 
@@ -765,7 +770,7 @@ class Programa(IterableNodo):
         #TODO: Creo que estas trés asignaciones pueden quitarse (Dani).
         Ambito.clases = {}
         Ambito.clases_por_nombre = {}
-        Ambito.arbol_clases = {}
+        Ambito.arbol_herencias = {}
 
         ambito = Ambito()
         ambito.add_metodo('abort', Metodo(nombre='abort', tipo='Object'))
