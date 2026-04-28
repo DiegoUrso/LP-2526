@@ -5,7 +5,8 @@ from typing import List, Optional
 
 errores_sem = []
 
-CLASES_BASICAS = {"Object", "Int", "Bool", "String"}
+CLASES_BASICAS = {"Object", "Int", "Bool", "String", "IO", "SELF_TYPE"}
+HERENCIAS_BASICAS = {clase:"Object" for clase in list(CLASES_BASICAS)}
 METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 def add_error(msg):
@@ -16,12 +17,13 @@ class Ambito:
     clases: dict[str, 'Ambito'] = {}
     ambitos: List['Ambito'] = []
     arbol_herencias: dict[str, 'Clase'] = {}
+    herencias_por_nombre: dict[str, str] = HERENCIAS_BASICAS.copy()
     clases_por_nombre: dict[str, 'Clase'] = {}
 
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
         self.variables: dict[str, str] = {}
-        self.metodos: dict[str, Metodo] = {}
+        self.metodos: dict[str, Metodo] = {}            
         
     def registrar_clase(self, nombre: str, clase: 'Clase'):
         #print("DEBUG:", clase.nombre, clase.linea)
@@ -38,8 +40,9 @@ class Ambito:
         else:
             Ambito.clases_por_nombre[nombre] = clase
 
-    def anhadir_clase_arbol(self, clase, padre):
-        Ambito.arbol_herencias[clase.nombre] = padre
+    def anhadir_clase(self, clase, padre):
+        self.arbol_herencias[clase.nombre] = padre
+        self.herencias_por_nombre[clase.nombre] = padre
         cars_padre: dict[str, 'Caracteristica'] = {}
 
         if padre != 'Object':
@@ -86,21 +89,26 @@ class Ambito:
     def add_variable(self, nombre: str, tipo: str):
         self.variables[nombre] = tipo
     
-    def es_subtipo(self, tipo1: Optional[str], tipo2: Optional[str]) -> bool:
-        if tipo1 is None or tipo2 is None:
-            return False
-        if tipo1 == tipo2:
+    def es_subtipo(self, tipo1: str, tipo2: str) -> bool:
+        if tipo1 == tipo2 or self.mca(tipo1, tipo2) == tipo2:
             return True
         elif tipo1 == 'Object':
-            return True
-        elif tipo1 == 'Int' and tipo2 == 'Object':
-            return True
-        elif tipo1 == 'String' and tipo2 == 'Object':
-            return True
-        elif tipo1 == 'Bool' and tipo2 == 'Object':
-            return True
+            return False
         else:
             return False
+
+    def mca(self, tipo1: str, tipo2: str) -> str:
+        lista_1 = [tipo1]
+        current_elem = tipo1
+        while current_elem != "Object":
+            current_elem = self.herencias_por_nombre[current_elem]
+            lista_1.append(current_elem)
+
+        current_elem = tipo2
+        while current_elem not in lista_1:
+            current_elem = self.herencias_por_nombre[current_elem]
+        
+        return current_elem
 
     def entrar_ambito(self):
         nuevo_ambito = deepcopy(Ambito(padre=self))
@@ -141,8 +149,14 @@ class Formal(Nodo):
             errores_sem.append(
                 f"{self.linea}: Formal parameter {self.nombre_variable} is multiply defined."
             )
-        else:
-            ambito.add_variable(self.nombre_variable, self.tipo)
+        if self.tipo == 'SELF_TYPE':
+            errores_sem.append(
+                f"{self.linea}: Formal parameter {self.nombre_variable} cannot have type {self.tipo}."
+            )
+        
+        ambito.add_variable(self.nombre_variable, self.tipo)
+
+
 
 
 class Expresion(Nodo):
@@ -313,7 +327,16 @@ class Condicional(Expresion):
         resultado += self.verdadero.str(n+2)
         resultado += self.falso.str(n+2)
         resultado += f'{(n)*" "}: {self.cast}\n'
-        return resultado
+        return resultado        
+        
+    def Tipo(self, ambito: Ambito):
+        self.condicion.Tipo(ambito)
+        self.verdadero.Tipo(ambito)
+        self.falso.Tipo(ambito)
+        tipo_v = self.verdadero.cast
+        tipo_f = self.falso.cast
+        if self.condicion.cast == 'Bool':
+            self.cast = ambito.mca(tipo_v, tipo_f)
 
 
 @dataclass
@@ -787,7 +810,7 @@ class Programa(IterableNodo):
                 ambito.registrar_clase(clase.nombre, clase)
 
         for clase in self.secuencia:
-            ambito.anhadir_clase_arbol(clase, clase.padre)
+            ambito.anhadir_clase(clase, clase.padre)
 
         for clase in self.secuencia:
             clase.Tipo(ambito)
@@ -861,11 +884,17 @@ class Metodo(Caracteristica):
             formal.Tipo(ambito_m)
 
         ambito_m.add_metodo(self.nombre, self)
-        if self.tipo not in Ambito.clases_por_nombre and self.tipo not in CLASES_BASICAS:
+        if self.tipo not in ambito_m.clases_por_nombre and self.tipo not in CLASES_BASICAS:
             errores_sem.append(
                 f"{self.linea}: Undefined return type {self.tipo} in method {self.nombre}."
             )
         self.cuerpo.Tipo(ambito_m)
+
+        if not ambito_m.es_subtipo(self.cuerpo.cast, self.tipo):
+            errores_sem.append(
+                    f"{self.linea}: Inferred return type {self.cuerpo.cast} of method {self.nombre} does not conform to declared return type {self.tipo}."
+                )
+
         ambito.salir_ambito()
 
 
