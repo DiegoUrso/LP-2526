@@ -19,6 +19,10 @@ class Ambito:
     arbol_herencias: dict[str, 'Clase'] = {}
     herencias_por_nombre: dict[str, str] = HERENCIAS_BASICAS.copy()
     clases_por_nombre: dict[str, 'Clase'] = {}
+    metodos_por_clase: dict[str, list[str]] = {"Object":["copy", "type_name", "abort"],
+                                                "Int":["copy", "type_name", "abort"], 
+                                                "Bool":["copy", "type_name", "abort"],
+                                                "String":["copy", "type_name", "abort", "length"]}
 
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
@@ -43,6 +47,7 @@ class Ambito:
     def anhadir_clase(self, clase, padre):
         self.arbol_herencias[clase.nombre] = padre
         self.herencias_por_nombre[clase.nombre] = padre
+        self.metodos_por_clase[clase.nombre] = []
         cars_padre: dict[str, 'Caracteristica'] = {}
 
         if padre != 'Object':
@@ -78,6 +83,9 @@ class Ambito:
     def add_metodo(self, nombre: str, metodo: 'Metodo'):
         self.metodos[nombre] = metodo
     
+    def add_metodo_to_clase(self, nom_clase: str, nom_metodo: str):
+        self.metodos_por_clase[nom_clase].append(nom_metodo)
+
     def get_tipo_variable(self, nombre: str) -> Optional[str]:
         if nombre in self.variables:
             return self.variables[nombre]
@@ -285,8 +293,12 @@ class LlamadaMetodo(Expresion):
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
             else:
                 break
-
-        if clase_nombre in CLASES_BASICAS:
+            
+        if self.nombre_metodo not in ambito.metodos_por_clase[clase_nombre]:
+            add_error(
+                f"{self.linea}: Dispatch to undefined method {metodo}."
+            )
+        elif clase_nombre in CLASES_BASICAS:
             if self.nombre_metodo in METODOS_BASICOS:
                 #TODO: Puede requerir actualizar el tipo para los demás métodos básicos en el futuro (Dani)
                 metodo = Metodo(nombre=self.nombre_metodo, tipo='int' if self.nombre_metodo == 'length' 
