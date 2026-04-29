@@ -790,6 +790,7 @@ class Programa(IterableNodo):
         return resultado
 
     def Tipo(self):
+        errores_sem.clear()
         #TODO: Creo que estas trés asignaciones pueden quitarse (Dani).
         Ambito.clases = {}
         Ambito.clases_por_nombre = {}
@@ -811,6 +812,9 @@ class Programa(IterableNodo):
 
         for clase in self.secuencia:
             ambito.anhadir_clase(clase, clase.padre)
+
+        if 'Main' not in Ambito.clases_por_nombre:
+            errores_sem.append("Class Main is not defined.")
 
         for clase in self.secuencia:
             clase.Tipo(ambito)
