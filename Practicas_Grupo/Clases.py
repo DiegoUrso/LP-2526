@@ -19,10 +19,6 @@ class Ambito:
     arbol_herencias: dict[str, 'Clase'] = {}
     herencias_por_nombre: dict[str, str] = HERENCIAS_BASICAS.copy()
     clases_por_nombre: dict[str, 'Clase'] = {}
-    metodos_por_clase: dict[str, list[str]] = {"Object":["copy", "type_name", "abort"],
-                                                "Int":["copy", "type_name", "abort"], 
-                                                "Bool":["copy", "type_name", "abort"],
-                                                "String":["copy", "type_name", "abort", "length"]}
 
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
@@ -47,7 +43,6 @@ class Ambito:
     def anhadir_clase(self, clase, padre):
         self.arbol_herencias[clase.nombre] = padre
         self.herencias_por_nombre[clase.nombre] = padre
-        self.metodos_por_clase[clase.nombre] = []
         cars_padre: dict[str, 'Caracteristica'] = {}
 
         if padre != 'Object':
@@ -57,6 +52,8 @@ class Ambito:
                 if isinstance(caracteristica, Metodo):
                     self.add_metodo(caracteristica.nombre, caracteristica)
                     if caracteristica.nombre in cars_padre:
+                        if len(caracteristica.formales) != len(cars_padre[caracteristica.nombre].formales):
+                            errores_sem.append(f"{caracteristica.linea}: Incompatible number of formal parameters in redefined method {caracteristica.nombre}.")
                         car_padre = cars_padre[caracteristica.nombre]
                         for formal in caracteristica.formales:
                             for f in car_padre.formales:
@@ -83,9 +80,6 @@ class Ambito:
     def add_metodo(self, nombre: str, metodo: 'Metodo'):
         self.metodos[nombre] = metodo
     
-    def add_metodo_to_clase(self, nom_clase: str, nom_metodo: str):
-        self.metodos_por_clase[nom_clase].append(nom_metodo)
-
     def get_tipo_variable(self, nombre: str) -> Optional[str]:
         if nombre in self.variables:
             return self.variables[nombre]
@@ -239,7 +233,6 @@ class LlamadaMetodoEstatico(Expresion):
             self.cast = self.cuerpo.cast
         else:
             self.cast = metodo.tipo
-        #print(f"Analizando llamada a método estático {self.nombre_metodo} con cuerpo {self.cuerpo} del tipo {self.cuerpo.cast} y clase {self.clase}. El tipo resultante es {self.cast}")
 
 
 @dataclass
@@ -286,6 +279,8 @@ class LlamadaMetodo(Expresion):
         else:
             clase_nombre = self.cuerpo.cast
 
+        #print(f"Analizando llamada a mÃ©todo {self.nombre_metodo} en la clase {clase_nombre}")
+
         while clase_nombre is not None and metodo is None:
             clase = Ambito.clases_por_nombre.get(clase_nombre)
             if clase:
@@ -293,14 +288,14 @@ class LlamadaMetodo(Expresion):
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
             else:
                 break
-            
-        if self.nombre_metodo not in ambito.metodos_por_clase[clase_nombre]:
+        
+        if self.nombre_metodo == 'length' and clase_nombre != 'String':
             add_error(
-                f"{self.linea}: Dispatch to undefined method {metodo}."
+                f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
             )
         elif clase_nombre in CLASES_BASICAS:
             if self.nombre_metodo in METODOS_BASICOS:
-                #TODO: Puede requerir actualizar el tipo para los demás métodos básicos en el futuro (Dani)
+                #TODO: Puede requerir actualizar el tipo para los demÃ¡s mÃ©todos bÃ¡sicos en el futuro (Dani)
                 metodo = Metodo(nombre=self.nombre_metodo, tipo='int' if self.nombre_metodo == 'length' 
                                 else 'SELF_TYPE', formales=[])
         elif metodo is None:
@@ -397,7 +392,7 @@ class Let(Expresion):
 
         self.inicializacion.Tipo(ambito_let)
 
-        # 🔴 CHECK IMPORTANTE (ESTO ES LO QUE TE FALTA)
+        # ðŸ”´ CHECK IMPORTANTE (ESTO ES LO QUE TE FALTA)
         if self.inicializacion.cast != '_no_type' and self.tipo != '_no_set':
             if not ambito.es_subtipo(self.inicializacion.cast, self.tipo):
                 errores_sem.append(
@@ -554,7 +549,7 @@ class Suma(OperacionBinaria):
                 f"{self.linea}: non-Int arguments: {tipo_izq} + {tipo_der}"
             )
 
-        self.cast = 'Int'  # en Cool, + siempre devuelve Int si es válido
+        self.cast = 'Int'  # en Cool, + siempre devuelve Int si es vÃ¡lido
 
 @dataclass
 class Resta(OperacionBinaria):
@@ -725,7 +720,7 @@ class Objeto(Expresion):
         return resultado
 
     def Tipo(self, ambito):
-        #print(f"Analizando objeto {self.nombre} en el ámbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
+        #print(f"Analizando objeto {self.nombre} en el Ã¡mbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
         if ambito.get_tipo_variable(self.nombre) is None and self.nombre != 'self':
             errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
         elif self.nombre == 'self':
@@ -803,7 +798,7 @@ class Programa(IterableNodo):
 
     def Tipo(self):
         errores_sem.clear()
-        #TODO: Creo que estas trés asignaciones pueden quitarse (Dani).
+        #TODO: Creo que estas trÃ©s asignaciones pueden quitarse (Dani).
         Ambito.clases = {}
         Ambito.clases_por_nombre = {}
         Ambito.arbol_herencias = {}
@@ -906,7 +901,7 @@ class Metodo(Caracteristica):
             )
         self.cuerpo.Tipo(ambito_m)
 
-        if not ambito_m.es_subtipo(self.cuerpo.cast, self.tipo):
+        if not ambito_m.es_subtipo(self.cuerpo.cast, self.tipo) and self.cuerpo.cast != 'SELF_TYPE':
             errores_sem.append(
                     f"{self.linea}: Inferred return type {self.cuerpo.cast} of method {self.nombre} does not conform to declared return type {self.tipo}."
                 )
