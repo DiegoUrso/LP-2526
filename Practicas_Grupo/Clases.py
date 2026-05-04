@@ -225,14 +225,20 @@ class LlamadaMetodoEstatico(Expresion):
             arg.Tipo(ambito)
         self.cuerpo.Tipo(ambito)
         clase = ambito.get_ambito_clase(self.clase)
-        if clase is None:
-            metodo = ambito.get_metodo(self.nombre_metodo)
+        if ambito.mca(self.cuerpo.cast, self.clase) != self.clase:
+            errores_sem.append(
+                f"{self.linea}: Expression type {self.cuerpo.cast} does not conform to declared static dispatch type {self.clase}."
+            )
+            self.cast = 'Object'
         else:
-            metodo = clase.get_metodo(self.nombre_metodo)
-        if metodo is None or metodo.tipo == 'SELF_TYPE':
-            self.cast = self.cuerpo.cast
-        else:
-            self.cast = metodo.tipo
+            if clase is None:
+                metodo = ambito.get_metodo(self.nombre_metodo)
+            else:
+                metodo = clase.get_metodo(self.nombre_metodo)
+            if metodo is None or metodo.tipo == 'SELF_TYPE':
+                self.cast = self.cuerpo.cast
+            else:
+                self.cast = metodo.tipo
 
 
 @dataclass
@@ -508,7 +514,6 @@ class Nueva(Nodo):
                 f"{self.linea}: 'new' used with undefined class {self.tipo}."
             )
         self.cast = self.tipo
-
 
 
 @dataclass
