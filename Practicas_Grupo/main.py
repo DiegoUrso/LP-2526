@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import traceback
 from colorama import init  ## Para colorear la salida en la terminal
 from termcolor import colored ## Para colorear la salida en la terminal
 init()
@@ -98,5 +99,6 @@ if True:
                         f.close()
                         g.close()
             except Exception as e:
+                traceback.print_exc()
                 print(f"Lanza excepción en {fich} con el texto {e}")
 

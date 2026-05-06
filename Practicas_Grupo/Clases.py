@@ -9,6 +9,7 @@ CLASES_BASICAS = {"Object", "Int", "Bool", "String", "IO", "SELF_TYPE"}
 HERENCIAS_BASICAS = {clase:"Object" for clase in list(CLASES_BASICAS)}
 METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
+
 def add_error(msg):
     if msg not in errores_sem:
         errores_sem.append(msg)
@@ -23,8 +24,42 @@ class Ambito:
     def __init__(self, padre: Optional['Ambito'] = None):
         self.padre = padre
         self.variables: dict[str, str] = {}
-        self.metodos: dict[str, Metodo] = {}            
+        self.metodos: dict[str, Metodo] = {}
+
+        for clase in CLASES_BASICAS:
+            if clase == "Object":
+                self.set_ambito_clase(clase, self)
+                self.anhadir_clase(Clase(nombre="Object", padre="Object",
+                                     caracteristicas=[Caracteristica(0, "Object", "Object")]),
+                                     #Faltan los métodos (?)
+                                     "Object")
+            elif clase == "Int":
+                self.set_ambito_clase(clase, self)
+                self.anhadir_clase(Clase(nombre="Int", padre="Object",
+                                     caracteristicas=[Caracteristica(0, "Int", "Int")]),
+                                     #Faltan los métodos (?)
+                                     "Object")
+            elif clase == "Bool":
+                self.set_ambito_clase(clase, self)
+                self.anhadir_clase(Clase(nombre="Bool", padre="Object",
+                                     caracteristicas=[Caracteristica(0, "Bool", "Bool")]),
+                                     #Faltan los métodos (?)
+                                     "Object")
+            elif clase == "String":
+                self.set_ambito_clase(clase, self)
+                self.anhadir_clase(Clase(nombre="String", padre="Object",
+                                     caracteristicas=[Caracteristica(0, "String", "String")]),
+                                     #Faltan los métodos (?)
+                                     "Object")
+            elif clase == "IO":
+                self.set_ambito_clase(clase, self)
+                self.anhadir_clase(Clase(nombre="IO", padre="Object",
+                                     caracteristicas=[Caracteristica(0, "IO", "IO")]),
+                                     #Faltan los métodos (?)
+                                     "Object")
         
+    #TODO: Posiblemente los métodos registrar_clase y anhadir_clase
+    #    debieran refactorizarse en un sólo método.
     def registrar_clase(self, nombre: str, clase: 'Clase'):
         #print("DEBUG:", clase.nombre, clase.linea)
         if nombre in CLASES_BASICAS:
@@ -41,7 +76,7 @@ class Ambito:
             Ambito.clases_por_nombre[nombre] = clase
 
     def anhadir_clase(self, clase, padre):
-        self.arbol_herencias[clase.nombre] = padre
+        self.arbol_herencias[clase.nombre] = padre #if isinstance(padre, str) else padre.nombre
         self.herencias_por_nombre[clase.nombre] = padre
         cars_padre: dict[str, 'Caracteristica'] = {}
 
@@ -61,12 +96,12 @@ class Ambito:
                                     errores_sem.append(f"{caracteristica.linea}: In redefined method {caracteristica.nombre}, parameter type {formal.tipo} is different from original type {f.tipo}")
 
     def get_ambito_clase(self, nombre: str) -> Optional['Ambito']:
-        if nombre in Ambito.clases:
-            return Ambito.clases[nombre]
+        if nombre in self.clases:
+            return self.clases[nombre]
         else:
             return None
         
-    def add_clase(self, nombre: str, ambito: 'Ambito'):
+    def set_ambito_clase(self, nombre: str, ambito: 'Ambito'):
         Ambito.clases[nombre] = ambito
 
     def get_metodo(self, nombre: str) -> Optional['Metodo']:
@@ -122,7 +157,7 @@ class Ambito:
             return self.ambitos.pop()
         else:
             return None
-
+        
 
 @dataclass
 class Nodo:
@@ -224,17 +259,17 @@ class LlamadaMetodoEstatico(Expresion):
         for arg in self.argumentos:
             arg.Tipo(ambito)
         self.cuerpo.Tipo(ambito)
-        clase = ambito.get_ambito_clase(self.clase)
+        ambito_clase = ambito.get_ambito_clase(self.clase)
         if ambito.mca(self.cuerpo.cast, self.clase) != self.clase:
             errores_sem.append(
                 f"{self.linea}: Expression type {self.cuerpo.cast} does not conform to declared static dispatch type {self.clase}."
             )
             self.cast = 'Object'
         else:
-            if clase is None:
+            if ambito_clase is None:
                 metodo = ambito.get_metodo(self.nombre_metodo)
             else:
-                metodo = clase.get_metodo(self.nombre_metodo)
+                metodo = ambito_clase.get_metodo(self.nombre_metodo)
             if metodo is None or metodo.tipo == 'SELF_TYPE':
                 self.cast = self.cuerpo.cast
             else:
@@ -287,23 +322,27 @@ class LlamadaMetodo(Expresion):
 
         #print(f"Analizando llamada a mÃ©todo {self.nombre_metodo} en la clase {clase_nombre}")
 
-        while clase_nombre is not None and metodo is None:
+        if clase_nombre is not None and metodo is None:
             clase = Ambito.clases_por_nombre.get(clase_nombre)
-            if clase:
-                metodo = clase.get_metodo(self.nombre_metodo)
+            if clase and clase.ambito:
+                clase.Tipo(clase.ambito)
+                metodo = clase.ambito.get_metodo(self.nombre_metodo)
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
-            else:
-                break
         
-        if self.nombre_metodo == 'length' and clase_nombre != 'String':
+        if self.nombre_metodo not in clase.ambito.metodos and clase_nombre is not None:
             add_error(
                 f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
             )
+            
+        #TODO: Esto es un apaño. Habrá que generalizarlo y expandirlo a los demás métodos o extraerlo 
+        #   al bucle que crea las clases básicas en Ambito.__init__()
+        ####
         elif clase_nombre in CLASES_BASICAS:
             if self.nombre_metodo in METODOS_BASICOS:
-                #TODO: Puede requerir actualizar el tipo para los demÃ¡s mÃ©todos bÃ¡sicos en el futuro (Dani)
                 metodo = Metodo(nombre=self.nombre_metodo, tipo='int' if self.nombre_metodo == 'length' 
                                 else 'SELF_TYPE', formales=[])
+        #### Fin del apaño
+        
         elif metodo is None:
             add_error(
                 f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
@@ -398,7 +437,6 @@ class Let(Expresion):
 
         self.inicializacion.Tipo(ambito_let)
 
-        # ðŸ”´ CHECK IMPORTANTE (ESTO ES LO QUE TE FALTA)
         if self.inicializacion.cast != '_no_type' and self.tipo != '_no_set':
             if not ambito.es_subtipo(self.inicializacion.cast, self.tipo):
                 errores_sem.append(
@@ -803,7 +841,6 @@ class Programa(IterableNodo):
 
     def Tipo(self):
         errores_sem.clear()
-        #TODO: Creo que estas trÃ©s asignaciones pueden quitarse (Dani).
         Ambito.clases = {}
         Ambito.clases_por_nombre = {}
         Ambito.arbol_herencias = {}
@@ -846,6 +883,7 @@ class Caracteristica(Nodo):
 class Clase(Nodo):
     nombre: str = '_no_set'
     padre: str = '_no_set'
+    ambito: Optional[Ambito] = None
     nombre_fichero: str = '_no_set'
     caracteristicas: List[Caracteristica] = field(default_factory=list)
 
@@ -868,16 +906,17 @@ class Clase(Nodo):
             ambito_class = ambito
         if ambito_class is None:
             raise Exception(f"Clase padre {self.padre} no encontrada para la clase {self.nombre} en el fichero {self.nombre_fichero}")
-        self.new_ambito = Ambito(padre=ambito_class)
-        self.new_ambito.tipo_clase_actual = self.nombre
+        self.ambito = Ambito(padre=ambito_class)
+        self.ambito.tipo_clase_actual = self.nombre
         for caracteristica in self.caracteristicas:
             if isinstance(caracteristica, Metodo):
-                self.new_ambito.add_metodo(caracteristica.nombre, caracteristica)
-        ambito.add_clase(self.nombre, self.new_ambito)
+                self.ambito.add_metodo(caracteristica.nombre, caracteristica)
+        ambito.set_ambito_clase(self.nombre, self.ambito)
         
     def load(self):
-        for caracteristica in self.caracteristicas:
-            caracteristica.Tipo(self.new_ambito)
+        if self.ambito is not None:
+            for caracteristica in self.caracteristicas:
+                caracteristica.Tipo(self.ambito)
 
 @dataclass
 class Metodo(Caracteristica):
