@@ -26,38 +26,19 @@ class Ambito:
         self.variables: dict[str, str] = {}
         self.metodos: dict[str, Metodo] = {}
 
+
+        clase_object = Clase(nombre="Object", padre="Object",
+                         caracteristicas=[Caracteristica(0, "Object", "Object")])
         for clase in CLASES_BASICAS:
             if clase == "Object":
                 self.set_ambito_clase(clase, self)
-                self.anhadir_clase(Clase(nombre="Object", padre="Object",
-                                     caracteristicas=[Caracteristica(0, "Object", "Object")]),
-                                     #Faltan los métodos (?)
-                                     "Object")
-            elif clase == "Int":
+                self.anhadir_clase(clase_object,clase_object)
+            elif clase != "SELF_TYPE":
                 self.set_ambito_clase(clase, self)
-                self.anhadir_clase(Clase(nombre="Int", padre="Object",
-                                     caracteristicas=[Caracteristica(0, "Int", "Int")]),
-                                     #Faltan los métodos (?)
-                                     "Object")
-            elif clase == "Bool":
-                self.set_ambito_clase(clase, self)
-                self.anhadir_clase(Clase(nombre="Bool", padre="Object",
-                                     caracteristicas=[Caracteristica(0, "Bool", "Bool")]),
-                                     #Faltan los métodos (?)
-                                     "Object")
-            elif clase == "String":
-                self.set_ambito_clase(clase, self)
-                self.anhadir_clase(Clase(nombre="String", padre="Object",
-                                     caracteristicas=[Caracteristica(0, "String", "String")]),
-                                     #Faltan los métodos (?)
-                                     "Object")
-            elif clase == "IO":
-                self.set_ambito_clase(clase, self)
-                self.anhadir_clase(Clase(nombre="IO", padre="Object",
-                                     caracteristicas=[Caracteristica(0, "IO", "IO")]),
-                                     #Faltan los métodos (?)
-                                     "Object")
-        
+                self.anhadir_clase(Clase(nombre=clase, padre="Object",
+                                     caracteristicas=[Caracteristica(0, clase, clase)]),
+                                     clase_object)
+                 
     #TODO: Posiblemente los métodos registrar_clase y anhadir_clase
     #    debieran refactorizarse en un sólo método.
     def registrar_clase(self, nombre: str, clase: 'Clase'):
@@ -75,13 +56,19 @@ class Ambito:
         else:
             Ambito.clases_por_nombre[nombre] = clase
 
-    def anhadir_clase(self, clase, padre):
-        self.arbol_herencias[clase.nombre] = padre #if isinstance(padre, str) else padre.nombre
-        self.herencias_por_nombre[clase.nombre] = padre
+    #TODO: EL PADRE TIENE QUE SER O STRING O CLASE
+    def anhadir_clase(self, clase: 'Clase', padre: 'Clase'):
+        if padre.nombre == "Bool" or padre.nombre == "String" or padre.nombre == "Int":
+            errores_sem.append(
+                f"{clase.linea}: Class {clase.nombre} cannot inherit class {padre.nombre}."
+                )
+
+        self.arbol_herencias[clase.nombre] = padre
+        self.herencias_por_nombre[clase.nombre] = padre.nombre
         cars_padre: dict[str, 'Caracteristica'] = {}
 
-        if padre != 'Object':
-            for c in self.clases_por_nombre.get(padre, Clase()).caracteristicas:
+        if padre.nombre != 'Object':
+            for c in self.clases_por_nombre.get(padre.nombre, Clase()).caracteristicas: #TODO: ¿Clase()?
                 cars_padre[c.nombre] = c
             for caracteristica in clase.caracteristicas:
                 if isinstance(caracteristica, Metodo):
@@ -101,6 +88,9 @@ class Ambito:
         else:
             return None
         
+    def get_clase_por_nombre(self, clase_nombre: str):
+        return self.clases_por_nombre.get(clase_nombre)
+
     def set_ambito_clase(self, nombre: str, ambito: 'Ambito'):
         Ambito.clases[nombre] = ambito
 
@@ -334,15 +324,15 @@ class LlamadaMetodo(Expresion):
                 f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
             )
             
-        #TODO: Esto es un apaño. Habrá que generalizarlo y expandirlo a los demás métodos o extraerlo 
-        #   al bucle que crea las clases básicas en Ambito.__init__()
+        #TODO: Esto es un apaño. Habrá que generalizarlo, expandirlo a los demás métodos (páginas 13 y
+        #   14 del manual) y extraerlo al bucle que crea las clases básicas en Ambito.__init__().
         ####
         elif clase_nombre in CLASES_BASICAS:
             if self.nombre_metodo in METODOS_BASICOS:
                 metodo = Metodo(nombre=self.nombre_metodo, tipo='int' if self.nombre_metodo == 'length' 
                                 else 'SELF_TYPE', formales=[])
         #### Fin del apaño
-        
+
         elif metodo is None:
             add_error(
                 f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
@@ -860,7 +850,7 @@ class Programa(IterableNodo):
                 ambito.registrar_clase(clase.nombre, clase)
 
         for clase in self.secuencia:
-            ambito.anhadir_clase(clase, clase.padre)
+            ambito.anhadir_clase(clase, ambito.get_clase_por_nombre(clase.padre))
 
         if 'Main' not in Ambito.clases_por_nombre:
             errores_sem.append("Class Main is not defined.")
