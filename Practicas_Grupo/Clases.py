@@ -33,11 +33,13 @@ class Ambito:
             if clase == "Object":
                 self.set_ambito_clase(clase, self)
                 self.anhadir_clase(clase_object,clase_object)
+                self.clases_por_nombre[clase] = clase_object
             elif clase != "SELF_TYPE":
                 self.set_ambito_clase(clase, self)
-                self.anhadir_clase(Clase(nombre=clase, padre="Object",
-                                     caracteristicas=[Caracteristica(0, clase, clase)]),
-                                     clase_object)
+                clase_basic = Clase(nombre=clase, padre="Object",
+                                     caracteristicas=[Caracteristica(0, clase, clase)])
+                self.anhadir_clase(clase_basic,clase_object)
+                self.clases_por_nombre[clase] = clase_basic
                  
     #TODO: Posiblemente los métodos registrar_clase y anhadir_clase
     #    debieran refactorizarse en un sólo método.
@@ -89,8 +91,12 @@ class Ambito:
             return None
         
     def get_clase_por_nombre(self, clase_nombre: str):
-        return self.clases_por_nombre.get(clase_nombre)
-
+        clase = self.clases_por_nombre[clase_nombre]
+        if clase is not None:
+            return clase
+        else:
+            return self.clases_por_nombre['Object']
+        
     def set_ambito_clase(self, nombre: str, ambito: 'Ambito'):
         Ambito.clases[nombre] = ambito
 
@@ -117,7 +123,9 @@ class Ambito:
         self.variables[nombre] = tipo
     
     def es_subtipo(self, tipo1: str, tipo2: str) -> bool:
-        if tipo1 == tipo2 or self.mca(tipo1, tipo2) == tipo2:
+        if tipo1 == "_no_type":
+            return False
+        elif tipo1 == tipo2 or self.mca(tipo1, tipo2) == tipo2:
             return True
         elif tipo1 == 'Object':
             return False
@@ -756,6 +764,7 @@ class Objeto(Expresion):
         #print(f"Analizando objeto {self.nombre} en el Ã¡mbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
         if ambito.get_tipo_variable(self.nombre) is None and self.nombre != 'self':
             errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
+            self.cast = 'Object'
         elif self.nombre == 'self':
             self.cast = 'SELF_TYPE'
         else:
@@ -849,7 +858,6 @@ class Programa(IterableNodo):
             else:
                 ambito.registrar_clase(clase.nombre, clase)
 
-        for clase in self.secuencia:
             ambito.anhadir_clase(clase, ambito.get_clase_por_nombre(clase.padre))
 
         if 'Main' not in Ambito.clases_por_nombre:
