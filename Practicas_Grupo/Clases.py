@@ -12,7 +12,7 @@ METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 def add_error(msg):
     if msg not in errores_sem:
-        errores_sem.append(msg)
+        add_error(msg)
 
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
@@ -25,6 +25,11 @@ class Ambito:
     metodos: dict[str, 'Metodo'] = {}
 
     def __init__(self, padre: Optional['Ambito'] = None):
+        self.metodos.clear()
+        self.variables.clear()
+        self.clases.clear()
+
+        print(f"DEBUG: {self.clases}, {self.variables}, {self.metodos}")
         clase_object = Clase(nombre="Object", padre="Object",
                          caracteristicas=[Caracteristica(0, "Object", "Object")])
         
@@ -41,34 +46,36 @@ class Ambito:
                 self.anhadir_clase(clase_basic,clase_object)
                 self.clases_por_nombre[clase] = clase_basic
     
-        #Añade los métodos básicos del padre si existe
+        #Añade los métodos y atributos del padre si existe
         if padre is None:
-            self.padre = clase_object.ambito
+            padre = clase_object.ambito
         else:
             self.padre = padre
             for metodo, metodo_obj in padre.metodos.items():
                 self.add_metodo(metodo, metodo_obj)
+            for variable, tipo in padre.variables.items():
+                self.add_variable(variable, tipo)
 
     #TODO: Posiblemente los métodos registrar_clase y anhadir_clase
     #    debieran refactorizarse en un sólo método.
     def registrar_clase(self, nombre: str, clase: 'Clase'):
         if nombre in CLASES_BASICAS:
-            errores_sem.append(
+            add_error(
                 f"{clase.linea + 1}: Redefinition of basic class {nombre}."
             )
             return
 
         if nombre in Ambito.clases_por_nombre:
-            errores_sem.append(
+            add_error(
                 f"{clase.linea + 1}: Class {nombre} was previously defined."
             )
         else:
             self.clases_por_nombre[nombre] = clase
 
-    #TODO: EL PADRE TIENE QUE SER O STRING O CLASE
+    #TODO: EL PADRE TIENE QUE SER STRING O CLASE
     def anhadir_clase(self, clase: 'Clase', padre: 'Clase'):
         if padre.nombre == "Bool" or padre.nombre == "String" or padre.nombre == "Int":
-            errores_sem.append(
+            add_error(
                 f"{clase.linea}: Class {clase.nombre} cannot inherit class {padre.nombre}."
                 )
 
@@ -84,12 +91,12 @@ class Ambito:
                     self.add_metodo(caracteristica.nombre, caracteristica)
                     if caracteristica.nombre in cars_padre:
                         if len(caracteristica.formales) != len(cars_padre[caracteristica.nombre].formales):
-                            errores_sem.append(f"{caracteristica.linea}: Incompatible number of formal parameters in redefined method {caracteristica.nombre}.")
+                            add_error(f"{caracteristica.linea}: Incompatible number of formal parameters in redefined method {caracteristica.nombre}.")
                         car_padre = cars_padre[caracteristica.nombre]
                         for formal in caracteristica.formales:
                             for f in car_padre.formales:
                                 if formal.nombre_variable == f.nombre_variable and formal.tipo != f.tipo:
-                                    errores_sem.append(f"{caracteristica.linea}: In redefined method {caracteristica.nombre}, parameter type {formal.tipo} is different from original type {f.tipo}")
+                                    add_error(f"{caracteristica.linea}: In redefined method {caracteristica.nombre}, parameter type {formal.tipo} is different from original type {f.tipo}")
 
     def get_ambito_clase(self, nombre: str) -> Optional['Ambito']:
         if nombre in self.clases:
@@ -120,6 +127,7 @@ class Ambito:
     
     def get_tipo_variable(self, nombre: str) -> Optional[str]:
         if nombre in self.variables:
+            print(f"DEBUG: {self.variables}")
             return self.variables[nombre]
         elif self.padre:
             return self.padre.get_tipo_variable(nombre)
@@ -127,8 +135,9 @@ class Ambito:
             return None
         
     def add_variable(self, nombre: str, tipo: str):
+        #if self.tipo_clase_actual != 'Object':
         self.variables[nombre] = tipo
-    
+
     def es_subtipo(self, tipo1: str, tipo2: str) -> bool:
         if tipo1 == "_no_type":
             return False
@@ -140,7 +149,7 @@ class Ambito:
             return False
 
     def mca(self, tipo1: str, tipo2: str) -> str:
-        print(f"DEBUG:Calculando mca de {tipo1} y {tipo2}")
+        print(f"DEBUG: Calculando mca de {tipo1} y {tipo2}")
         lista_1 = [tipo1]
         current_elem = tipo1
         while current_elem != "Object":
@@ -185,15 +194,17 @@ class Formal(Nodo):
         return resultado
     def Tipo(self, ambito: Ambito):
         if self.nombre_variable == 'self':
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: 'self' cannot be the name of a formal parameter."
             )
         if self.nombre_variable in ambito.variables:
-            errores_sem.append(
+            print(f"DEBUG: {self.nombre_variable}, {ambito.variables}")
+            add_error(
                 f"{self.linea}: Formal parameter {self.nombre_variable} is multiply defined."
             )
         if self.tipo == 'SELF_TYPE':
-            errores_sem.append(
+            
+            add_error(
                 f"{self.linea}: Formal parameter {self.nombre_variable} cannot have type {self.tipo}."
             )
         
@@ -230,12 +241,12 @@ class Asignacion(Expresion):
 
         # si la variable no existe
         if tipo_var is None:
-            errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
+            add_error(f"{self.linea}: Undeclared identifier {self.nombre}.")
             self.cast = tipo_expr
             return
 
         if not ambito.es_subtipo(tipo_expr, tipo_var):
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: Type {tipo_expr} of assigned expression does not conform to declared type {tipo_var} of identifier {self.nombre}."
             )
 
@@ -267,7 +278,7 @@ class LlamadaMetodoEstatico(Expresion):
         self.cuerpo.Tipo(ambito)
         ambito_clase = ambito.get_ambito_clase(self.clase)
         if ambito.mca(self.cuerpo.cast, self.clase) != self.clase:
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: Expression type {self.cuerpo.cast} does not conform to declared static dispatch type {self.clase}."
             )
             self.cast = 'Object'
@@ -416,7 +427,7 @@ class Bucle(Expresion):
         self.cuerpo.Tipo(ambito)
 
         if self.condicion.cast != 'Bool':
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: Loop condition does not have type Bool."
             )
 
@@ -447,11 +458,11 @@ class Let(Expresion):
 
         if self.inicializacion.cast != '_no_type' and self.tipo != '_no_set':
             if not ambito.es_subtipo(self.inicializacion.cast, self.tipo):
-                errores_sem.append(
+                add_error(
                     f"{self.linea}: Inferred type {self.inicializacion.cast} of initialization of {self.nombre} does not conform to identifier's declared type {self.tipo}."
                 )
         if self.nombre == 'self':
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: 'self' cannot be bound in a 'let' expression."
             )
 
@@ -522,7 +533,7 @@ class Swicht(Nodo):
         tipos_vistos = set()
         for caso in self.casos:
             if caso.tipo in tipos_vistos:
-                errores_sem.append(
+                add_error(
                     f"{caso.linea}: Duplicate branch {caso.tipo} in case statement."
                 )
             else:
@@ -556,7 +567,7 @@ class Nueva(Nodo):
     
     def Tipo(self, ambito):
         if self.tipo not in Ambito.clases_por_nombre and self.tipo not in CLASES_BASICAS:
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: 'new' used with undefined class {self.tipo}."
             )
         self.cast = self.tipo
@@ -596,7 +607,7 @@ class Suma(OperacionBinaria):
         tipo_der = self.derecha.cast
 
         if tipo_izq != 'Int' or tipo_der != 'Int':
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: non-Int arguments: {tipo_izq} + {tipo_der}"
             )
 
@@ -705,7 +716,7 @@ class Igual(OperacionBinaria):
         tipos_basicos = ['Int', 'Bool', 'String']
 
         if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
-            errores_sem.append(
+            add_err(
                 f"{self.linea}: Illegal comparison with a basic type."
             )
 
@@ -771,9 +782,9 @@ class Objeto(Expresion):
         return resultado
 
     def Tipo(self, ambito):
-        #print(f"Analizando objeto {self.nombre} en el Ã¡mbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
+        print(f"Analizando objeto {self.nombre} en el ámbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
         if ambito.get_tipo_variable(self.nombre) is None and self.nombre != 'self':
-            errores_sem.append(f"{self.linea}: Undeclared identifier {self.nombre}.")
+            add_error(f"{self.linea}: Undeclared identifier {self.nombre}.")
             self.cast = 'Object'
         elif self.nombre == 'self':
             self.cast = 'SELF_TYPE'
@@ -871,7 +882,7 @@ class Programa(IterableNodo):
             ambito.anhadir_clase(clase, ambito.get_clase_por_nombre(clase.padre))
 
         if 'Main' not in Ambito.clases_por_nombre:
-            errores_sem.append("Class Main is not defined.")
+            add_error("Class Main is not defined.")
 
         for clase in self.secuencia:
             clase.Tipo(ambito)
@@ -948,13 +959,13 @@ class Metodo(Caracteristica):
 
         ambito_m.add_metodo(self.nombre, self)
         if self.tipo not in ambito_m.clases_por_nombre and self.tipo not in CLASES_BASICAS:
-            errores_sem.append(
+            add_error(
                 f"{self.linea}: Undefined return type {self.tipo} in method {self.nombre}."
             )
         self.cuerpo.Tipo(ambito_m)
 
         if not ambito_m.es_subtipo(self.cuerpo.cast, self.tipo) and self.cuerpo.cast != 'SELF_TYPE':
-            errores_sem.append(
+            add_error(
                     f"{self.linea}: Inferred return type {self.cuerpo.cast} of method {self.nombre} does not conform to declared return type {self.tipo}."
                 )
 
@@ -973,17 +984,19 @@ class Atributo(Caracteristica):
     
     def Tipo(self, ambito: Ambito):
         if self.nombre == "self":
-            errores_sem.append(f"{self.linea}: 'self' cannot be the name of an attribute.")
+            add_error(f"{self.linea}: 'self' cannot be the name of an attribute.")
             return
 
         padre = ambito.padre
-        while padre:
-            if self.nombre in padre.variables:
-                errores_sem.append(
+        while padre is not None:
+            if self.nombre in padre.variables and padre.tipo_clase_actual != 'Object':
+                print(f"DEBUG: {padre.tipo_clase_actual}: {padre.variables}")
+                add_error(
                     f"{self.linea}: Attribute {self.nombre} is an attribute of an inherited class."
                 )
                 break
-            padre = padre.padre
+            
+            padre = padre.padre if hasattr(padre, 'padre') else None
 
         self.cuerpo.Tipo(ambito)
         ambito.add_variable(self.nombre, self.tipo)
