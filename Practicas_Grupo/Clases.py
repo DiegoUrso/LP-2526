@@ -6,13 +6,13 @@ from typing import List, Optional
 errores_sem = []
 
 CLASES_BASICAS = {"Object", "Int", "Bool", "String", "IO", "SELF_TYPE"}
-HERENCIAS_BASICAS = {clase:"Object" for clase in list(CLASES_BASICAS)}
+HERENCIAS_BASICAS = {} #clase:"Object" for clase in list(CLASES_BASICAS)}
 METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 
 def add_error(msg):
     if msg not in errores_sem:
-        add_error(msg)
+        errores_sem.append(msg)
 
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
@@ -25,11 +25,6 @@ class Ambito:
     metodos: dict[str, 'Metodo'] = {}
 
     def __init__(self, padre: Optional['Ambito'] = None):
-        self.metodos.clear()
-        self.variables.clear()
-        self.clases.clear()
-
-        print(f"DEBUG: {self.clases}, {self.variables}, {self.metodos}")
         clase_object = Clase(nombre="Object", padre="Object",
                          caracteristicas=[Caracteristica(0, "Object", "Object")])
         
@@ -37,24 +32,44 @@ class Ambito:
         for clase in CLASES_BASICAS:
             if clase == "Object":
                 self.set_ambito_clase(clase, self)
-                self.anhadir_clase(clase_object,clase_object)
+                self.anhadir_clase(clase_object, Clase(0))
                 self.clases_por_nombre[clase] = clase_object
-            elif clase != "SELF_TYPE":
+                self.add_metodo("abort", Metodo(nombre="abort", tipo="Object", formales=[]))
+                self.add_metodo("type_name", Metodo(nombre="type_name", tipo="String", formales=[]))
+                self.add_metodo("copy", Metodo(nombre="copy", tipo="SELF_TYPE", formales=[]))
+            else:
                 self.set_ambito_clase(clase, self)
                 clase_basic = Clase(nombre=clase, padre="Object",
-                                     caracteristicas=[Caracteristica(0, clase, clase)])
-                self.anhadir_clase(clase_basic,clase_object)
-                self.clases_por_nombre[clase] = clase_basic
-    
-        #Añade los métodos y atributos del padre si existe
+                                        caracteristicas=[Caracteristica(0, clase, clase)])
+                if clase == "IO":
+                    self.anhadir_clase(clase_basic,clase_object)
+                    self.clases_por_nombre[clase] = clase_basic
+                    self.add_metodo("out_string", Metodo(nombre="out_string", tipo="SELF_TYPE", formales=[Formal(nombre_variable="x", tipo="String")]))
+                    self.add_metodo("out_int", Metodo(nombre="out_int", tipo="SELF_TYPE", formales=[Formal(nombre_variable="x", tipo="Int")]))
+                    self.add_metodo("in_string", Metodo(nombre="in_string", tipo="String", formales=[]))
+                    self.add_metodo("in_int", Metodo(nombre="in_int", tipo="Int", formales=[]))
+                elif clase == "Int":
+                    self.anhadir_clase(clase_basic, clase_object)
+                    self.clases_por_nombre[clase] = clase_basic
+                    
+                elif clase == "String":
+                    self.anhadir_clase(clase_basic, clase_object)
+                    self.clases_por_nombre[clase] = clase_basic
+                    self.add_metodo("length", Metodo(nombre="length", tipo="Int", formales=[]))
+                    self.add_metodo("concat", Metodo(nombre="concat", tipo="String", formales=[Formal(nombre_variable="s", tipo="String")]))
+                    self.add_metodo("substr", Metodo(nombre="substr", tipo="String", formales=[Formal(nombre_variable="i", tipo="Int"), Formal(nombre_variable="l", tipo="Int")]))
+                elif clase == "Bool":
+                    self.anhadir_clase(clase_basic, clase_object)
+                    self.clases_por_nombre[clase] = clase_basic
+
+        #Añade los métodos básicos del padre si existe
+        
         if padre is None:
-            padre = clase_object.ambito
+            self.padre = clase_object.ambito
         else:
             self.padre = padre
             for metodo, metodo_obj in padre.metodos.items():
                 self.add_metodo(metodo, metodo_obj)
-            for variable, tipo in padre.variables.items():
-                self.add_variable(variable, tipo)
 
     #TODO: Posiblemente los métodos registrar_clase y anhadir_clase
     #    debieran refactorizarse en un sólo método.
@@ -72,7 +87,7 @@ class Ambito:
         else:
             self.clases_por_nombre[nombre] = clase
 
-    #TODO: EL PADRE TIENE QUE SER STRING O CLASE
+    #TODO: EL PADRE TIENE QUE SER O STRING O CLASE
     def anhadir_clase(self, clase: 'Clase', padre: 'Clase'):
         if padre.nombre == "Bool" or padre.nombre == "String" or padre.nombre == "Int":
             add_error(
@@ -123,11 +138,11 @@ class Ambito:
             return None
     
     def add_metodo(self, nombre: str, metodo: 'Metodo'):
-        self.metodos[nombre] = metodo
+        if metodo not in self.metodos.values():
+            self.metodos[nombre] = metodo
     
     def get_tipo_variable(self, nombre: str) -> Optional[str]:
         if nombre in self.variables:
-            print(f"DEBUG: {self.variables}")
             return self.variables[nombre]
         elif self.padre:
             return self.padre.get_tipo_variable(nombre)
@@ -135,9 +150,8 @@ class Ambito:
             return None
         
     def add_variable(self, nombre: str, tipo: str):
-        #if self.tipo_clase_actual != 'Object':
         self.variables[nombre] = tipo
-
+    
     def es_subtipo(self, tipo1: str, tipo2: str) -> bool:
         if tipo1 == "_no_type":
             return False
@@ -198,16 +212,13 @@ class Formal(Nodo):
                 f"{self.linea}: 'self' cannot be the name of a formal parameter."
             )
         if self.nombre_variable in ambito.variables:
-            print(f"DEBUG: {self.nombre_variable}, {ambito.variables}")
             add_error(
                 f"{self.linea}: Formal parameter {self.nombre_variable} is multiply defined."
             )
         if self.tipo == 'SELF_TYPE':
-            
             add_error(
                 f"{self.linea}: Formal parameter {self.nombre_variable} cannot have type {self.tipo}."
             )
-        
         ambito.add_variable(self.nombre_variable, self.tipo)
 
 
@@ -236,6 +247,8 @@ class Asignacion(Expresion):
     def Tipo(self, ambito: Ambito):
         self.cuerpo.Tipo(ambito)
 
+        #TODO NOTA: creo que se están mezclando los ámbitos. 
+        #Los atributos se ven entre clases de distintas jerarquías hereditarias.
         tipo_var = ambito.get_tipo_variable(self.nombre)
         tipo_expr = self.cuerpo.cast
 
@@ -352,14 +365,6 @@ class LlamadaMetodo(Expresion):
                     f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
                 )
             
-        #TODO: Esto es un apaño. Habrá que generalizarlo, expandirlo a los demás métodos (páginas 13 y
-        #   14 del manual) y extraerlo al bucle que crea las clases básicas en Ambito.__init__().
-        ####
-        elif clase_nombre in CLASES_BASICAS:
-            if self.nombre_metodo in METODOS_BASICOS:
-                metodo = Metodo(nombre=self.nombre_metodo, tipo='Int' if self.nombre_metodo == 'length' 
-                                else 'SELF_TYPE', formales=[])
-        #### Fin del apaño
 
         elif metodo is None:
             add_error(
@@ -404,9 +409,9 @@ class Condicional(Expresion):
         self.condicion.Tipo(ambito)
         self.verdadero.Tipo(ambito)
         self.falso.Tipo(ambito)
-        tipo_v = self.verdadero.cast
-        tipo_f = self.falso.cast
         if self.condicion.cast == 'Bool':
+            tipo_v = self.verdadero.cast
+            tipo_f = self.falso.cast
             self.cast = ambito.mca(tipo_v, tipo_f)
 
 
@@ -716,7 +721,7 @@ class Igual(OperacionBinaria):
         tipos_basicos = ['Int', 'Bool', 'String']
 
         if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
-            add_err(
+            add_error(
                 f"{self.linea}: Illegal comparison with a basic type."
             )
 
@@ -782,7 +787,7 @@ class Objeto(Expresion):
         return resultado
 
     def Tipo(self, ambito):
-        print(f"Analizando objeto {self.nombre} en el ámbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
+        #print(f"Analizando objeto {self.nombre} en el Ã¡mbito actual. Variables disponibles: {ambito.variables}. {ambito.get_tipo_variable(self.nombre)}")
         if ambito.get_tipo_variable(self.nombre) is None and self.nombre != 'self':
             add_error(f"{self.linea}: Undeclared identifier {self.nombre}.")
             self.cast = 'Object'
@@ -988,15 +993,15 @@ class Atributo(Caracteristica):
             return
 
         padre = ambito.padre
-        while padre is not None:
-            if self.nombre in padre.variables and padre.tipo_clase_actual != 'Object':
-                print(f"DEBUG: {padre.tipo_clase_actual}: {padre.variables}")
+        while padre and padre.tipo_clase_actual not in CLASES_BASICAS:
+            if (self.nombre, self.tipo) in padre.variables.items():
+                print(f"DEBUG: padre {padre.tipo_clase_actual}, atributo {self.nombre}, tipo {self.tipo}")
                 add_error(
                     f"{self.linea}: Attribute {self.nombre} is an attribute of an inherited class."
                 )
                 break
-            
-            padre = padre.padre if hasattr(padre, 'padre') else None
+            padre = padre.padre
 
         self.cuerpo.Tipo(ambito)
+        print(f"DEBUG: Añadiendo variable {self.nombre} de tipo {self.tipo} a clase {ambito.tipo_clase_actual}")
         ambito.add_variable(self.nombre, self.tipo)
