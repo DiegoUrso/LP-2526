@@ -21,10 +21,15 @@ class Ambito:
     arbol_herencias: dict[str, 'Clase'] = {}
     herencias_por_nombre: dict[str, str] = HERENCIAS_BASICAS.copy()
     clases_por_nombre: dict[str, 'Clase'] = {}
-    variables: dict[str, str] = {}
+    variables: dict[str, str] = field(default_factory=dict)
     metodos: dict[str, 'Metodo'] = {}
 
     def __init__(self, padre: Optional['Ambito'] = None):
+        if isinstance(padre, Ambito):
+            self.variables=padre.variables.copy()
+        else:
+            self.variables = {}
+
         clase_object = Clase(nombre="Object", padre="Object",
                          caracteristicas=[Caracteristica(0, "Object", "Object")])
         
@@ -892,6 +897,7 @@ class Programa(IterableNodo):
         for clase in self.secuencia:
             clase.Tipo(ambito)
         for clase in self.secuencia:
+            #The problem is very likely here that foreign ambitos are overwritten
             clase.load()
 
 @dataclass
