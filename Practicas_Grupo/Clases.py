@@ -1000,7 +1000,7 @@ class Atributo(Caracteristica):
 
         padre = ambito.padre
         while padre and padre.tipo_clase_actual not in CLASES_BASICAS:
-            if (self.nombre, self.tipo) in padre.variables.items():
+            if self.nombre in padre.variables.keys():
                 print(f"DEBUG: padre {padre.tipo_clase_actual}, atributo {self.nombre}, tipo {self.tipo}")
                 add_error(
                     f"{self.linea}: Attribute {self.nombre} is an attribute of an inherited class."
