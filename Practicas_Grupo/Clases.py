@@ -26,9 +26,11 @@ class Ambito:
 
     def __init__(self, padre: Optional['Ambito'] = None):
         if isinstance(padre, Ambito):
-            self.variables=padre.variables.copy()
+            self.variables={}
+            self.metodos=padre.metodos.copy()
         else:
             self.variables = {}
+            self.metodos = {}
 
         clase_object = Clase(nombre="Object", padre="Object",
                          caracteristicas=[Caracteristica(0, "Object", "Object")])
@@ -108,7 +110,7 @@ class Ambito:
                 cars_padre[c.nombre] = c
             for caracteristica in clase.caracteristicas:
                 if isinstance(caracteristica, Metodo):
-                    self.add_metodo(caracteristica.nombre, caracteristica)
+                    #self.add_metodo(caracteristica.nombre, caracteristica)
                     if caracteristica.nombre in cars_padre:
                         if len(caracteristica.formales) != len(cars_padre[caracteristica.nombre].formales):
                             add_error(f"{caracteristica.linea}: Incompatible number of formal parameters in redefined method {caracteristica.nombre}.")
@@ -369,7 +371,7 @@ class LlamadaMetodo(Expresion):
                 add_error(
                     f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
                 )
-            
+            self.cast = "Object"
 
         elif metodo is None:
             add_error(
