@@ -361,13 +361,13 @@ class LlamadaMetodo(Expresion):
 
         if clase_nombre is not None:
             clase = ambito.get_clase_por_nombre(clase_nombre)
+            clase.Tipo(ambito)
             if clase and clase.ambito:
                 clase.Tipo(clase.ambito)
                 metodo = clase.ambito.get_metodo(self.nombre_metodo)
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
-        
         if clase.ambito is not None and clase_nombre is not None:
-            if self.nombre_metodo not in clase.ambito.metodos:
+            if self.nombre_metodo not in clase.ambito.metodos.keys():
                 add_error(
                     f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
                 )
@@ -384,6 +384,7 @@ class LlamadaMetodo(Expresion):
             if len(metodo.formales) == len(self.argumentos) and not hasattr(self, "_checked_args"):
                 self._checked_args = True
                 for formal, arg in zip(metodo.formales, self.argumentos):
+                    print("DEBUG: tipo formal:", formal.tipo, "tipo arg:", arg.cast)
                     if not ambito.es_subtipo(arg.cast, formal.tipo):
                         add_error(
                             f"{self.linea}: In call of method {self.nombre_metodo}, "
