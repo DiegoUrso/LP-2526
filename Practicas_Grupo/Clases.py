@@ -11,8 +11,7 @@ METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 
 def add_error(msg):
-    if msg not in errores_sem:
-        errores_sem.append(msg)
+    errores_sem.append(msg)
 
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
