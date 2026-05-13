@@ -728,7 +728,7 @@ class Igual(OperacionBinaria):
 
         tipos_basicos = ['Int', 'Bool', 'String']
 
-        if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
+        if (tipo_izq in tipos_basicos or tipo_der in tipos_basicos) and tipo_izq!=tipo_der:
             add_error(
                 f"{self.linea}: Illegal comparison with a basic type."
             )
