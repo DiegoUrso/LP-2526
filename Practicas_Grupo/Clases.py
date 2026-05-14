@@ -11,8 +11,7 @@ METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 
 def add_error(msg):
-    if msg not in errores_sem:
-        errores_sem.append(msg)
+    errores_sem.append(msg)
 
 class Ambito:
     clases: dict[str, 'Ambito'] = {}
@@ -36,38 +35,12 @@ class Ambito:
                          caracteristicas=[Caracteristica(0, "Object", "Object")])
         
         #Añade las clases básicas al ámbito global
-        for clase in CLASES_BASICAS:
-            if clase == "Object":
-                self.set_ambito_clase(clase, self)
-                self.anhadir_clase(clase_object, Clase(0))
-                self.clases_por_nombre[clase] = clase_object
-                self.add_metodo("abort", Metodo(nombre="abort", tipo="Object", formales=[]))
-                self.add_metodo("type_name", Metodo(nombre="type_name", tipo="String", formales=[]))
-                self.add_metodo("copy", Metodo(nombre="copy", tipo="SELF_TYPE", formales=[]))
-            else:
-                self.set_ambito_clase(clase, self)
-                clase_basic = Clase(nombre=clase, padre="Object",
-                                        caracteristicas=[Caracteristica(0, clase, clase)])
-                if clase == "IO":
-                    self.anhadir_clase(clase_basic,clase_object)
-                    self.clases_por_nombre[clase] = clase_basic
-                    self.add_metodo("out_string", Metodo(nombre="out_string", tipo="SELF_TYPE", formales=[Formal(nombre_variable="x", tipo="String")]))
-                    self.add_metodo("out_int", Metodo(nombre="out_int", tipo="SELF_TYPE", formales=[Formal(nombre_variable="x", tipo="Int")]))
-                    self.add_metodo("in_string", Metodo(nombre="in_string", tipo="String", formales=[]))
-                    self.add_metodo("in_int", Metodo(nombre="in_int", tipo="Int", formales=[]))
-                elif clase == "Int":
-                    self.anhadir_clase(clase_basic, clase_object)
-                    self.clases_por_nombre[clase] = clase_basic
-                    
-                elif clase == "String":
-                    self.anhadir_clase(clase_basic, clase_object)
-                    self.clases_por_nombre[clase] = clase_basic
-                    self.add_metodo("length", Metodo(nombre="length", tipo="Int", formales=[]))
-                    self.add_metodo("concat", Metodo(nombre="concat", tipo="String", formales=[Formal(nombre_variable="s", tipo="String")]))
-                    self.add_metodo("substr", Metodo(nombre="substr", tipo="String", formales=[Formal(nombre_variable="i", tipo="Int"), Formal(nombre_variable="l", tipo="Int")]))
-                elif clase == "Bool":
-                    self.anhadir_clase(clase_basic, clase_object)
-                    self.clases_por_nombre[clase] = clase_basic
+        self.set_ambito_clase("Object", self)
+        self.anhadir_clase(clase_object, Clase(0))
+        self.clases_por_nombre["Object"] = clase_object
+        self.add_metodo("abort", Metodo(nombre="abort", tipo="Object", formales=[]))
+        self.add_metodo("type_name", Metodo(nombre="type_name", tipo="String", formales=[]))
+        self.add_metodo("copy", Metodo(nombre="copy", tipo="SELF_TYPE", formales=[]))
 
         #Añade los métodos básicos del padre si existe
         
@@ -83,7 +56,7 @@ class Ambito:
     def registrar_clase(self, nombre: str, clase: 'Clase'):
         if nombre in CLASES_BASICAS:
             add_error(
-                f"{clase.linea + 1}: Redefinition of basic class {nombre}."
+                f"{clase.linea + 1}: 2nd Redefinition of basic class {nombre}."
             )
             return
 
@@ -96,7 +69,7 @@ class Ambito:
 
     #TODO: EL PADRE TIENE QUE SER O STRING O CLASE
     def anhadir_clase(self, clase: 'Clase', padre: 'Clase'):
-        if padre.nombre == "Bool" or padre.nombre == "String" or padre.nombre == "Int":
+        if padre.nombre == "Bool" or padre.nombre == "String" or padre.nombre == "Int" or padre.nombre == "SELF_TYPE":
             add_error(
                 f"{clase.linea}: Class {clase.nombre} cannot inherit class {padre.nombre}."
                 )
@@ -363,21 +336,21 @@ class LlamadaMetodo(Expresion):
             clase = ambito.get_clase_por_nombre(clase_nombre)
             clase.Tipo(ambito)
             if clase and clase.ambito:
-                clase.Tipo(clase.ambito)
                 metodo = clase.ambito.get_metodo(self.nombre_metodo)
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
-        if clase.ambito is not None and clase_nombre is not None:
-            if self.nombre_metodo not in clase.ambito.metodos.keys():
-                add_error(
-                    f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
-                )
-            self.cast = "Object"
+                print("DEBUG: 1")
+                if metodo not in clase.ambito.metodos.values():
+                    add_error(
+                        f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
+                    )
+                self.cast = "Object"
 
-        elif metodo is None:
-            add_error(
-                f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
-            )
-            self.cast = 'Object'
+        if metodo is None:
+            print("DEBUG: 2")
+        #    add_error(
+        #        f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
+        #    )
+        #    self.cast = 'Object'
             return
 
         if metodo is not None:
@@ -728,7 +701,7 @@ class Igual(OperacionBinaria):
 
         tipos_basicos = ['Int', 'Bool', 'String']
 
-        if (tipo_izq in tipos_basicos or tipo_der in tipos_basicos) and tipo_izq!=tipo_der:
+        if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
             add_error(
                 f"{self.linea}: Illegal comparison with a basic type."
             )
@@ -879,11 +852,39 @@ class Programa(IterableNodo):
         Ambito.arbol_herencias = {}
 
         ambito = Ambito()
-        ambito.add_metodo('abort', Metodo(nombre='abort', tipo='Object'))
-        ambito.add_metodo('type_name', Metodo(nombre='type_name', tipo='String'))
-        ambito.add_metodo('copy', Metodo(nombre='copy', tipo='SELF_TYPE'))
-        ambito.add_metodo('length', Metodo(nombre='length', tipo='Int'))
+        for clase in CLASES_BASICAS:
+            ambito_basic = ambito.entrar_ambito()
+            ambito.set_ambito_clase(clase, ambito_basic)
+            clase_basic = Clase(nombre=clase, padre="Object", ambito=ambito_basic,
+                                    caracteristicas=[Caracteristica(0, clase, clase)])
+            #Registrar clase sin errores
+            ambito.clases_por_nombre[clase] = clase_basic
 
+            if clase == "IO":
+                ambito_basic.anhadir_clase(clase_basic,ambito.get_clase_por_nombre("Object"))
+                ambito_basic.clases_por_nombre[clase] = clase_basic
+                ambito_basic.add_metodo("out_string", Metodo(nombre="out_string", tipo="SELF_TYPE", formales=[Formal(nombre_variable="x", tipo="String")]))
+                ambito_basic.add_metodo("out_int", Metodo(nombre="out_int", tipo="SELF_TYPE", formales=[Formal(nombre_variable="x", tipo="Int")]))
+                ambito_basic.add_metodo("in_string", Metodo(nombre="in_string", tipo="String", formales=[]))
+                ambito_basic.add_metodo("in_int", Metodo(nombre="in_int", tipo="Int", formales=[]))
+            
+            elif clase == "Int":
+                ambito_basic.anhadir_clase(clase_basic, ambito.get_clase_por_nombre("Object"))
+                ambito_basic.clases_por_nombre[clase] = clase_basic
+                
+            elif clase == "String":
+                ambito_basic.anhadir_clase(clase_basic, ambito.get_clase_por_nombre("Object"))
+                ambito_basic.clases_por_nombre[clase] = clase_basic
+                ambito_basic.add_metodo("length", Metodo(nombre="length", tipo="Int", formales=[]))
+                ambito_basic.add_metodo("concat", Metodo(nombre="concat", tipo="String", formales=[Formal(nombre_variable="s", tipo="String")]))
+                ambito_basic.add_metodo("substr", Metodo(nombre="substr", tipo="String", formales=[Formal(nombre_variable="i", tipo="Int"), Formal(nombre_variable="l", tipo="Int")]))
+            
+            elif clase == "Bool":
+                ambito_basic.anhadir_clase(clase_basic, ambito.get_clase_por_nombre("Object"))
+                ambito_basic.clases_por_nombre[clase] = clase_basic
+            
+            ambito.salir_ambito()
+            
         for clase in self.secuencia:
             if clase.nombre in CLASES_BASICAS:
                 add_error(
@@ -978,10 +979,11 @@ class Metodo(Caracteristica):
             )
         self.cuerpo.Tipo(ambito_m)
 
-        if not ambito_m.es_subtipo(self.cuerpo.cast, self.tipo) and self.cuerpo.cast != 'SELF_TYPE':
-            add_error(
-                    f"{self.linea}: Inferred return type {self.cuerpo.cast} of method {self.nombre} does not conform to declared return type {self.tipo}."
-                )
+        if self.cuerpo.cast != 'SELF_TYPE':
+            if not ambito_m.es_subtipo(self.cuerpo.cast, self.tipo): #and self.cuerpo.cast != 'SELF_TYPE':
+                add_error(
+                        f"{self.linea}: Inferred return type {self.cuerpo.cast} of method {self.nombre} does not conform to declared return type {self.tipo}."
+                    )
 
         ambito.salir_ambito()
 
