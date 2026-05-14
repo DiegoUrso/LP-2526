@@ -334,7 +334,7 @@ class LlamadaMetodo(Expresion):
 
         if clase_nombre is not None:
             clase = ambito.get_clase_por_nombre(clase_nombre)
-            clase.Tipo(ambito)
+            #clase.Tipo(ambito)
             if clase and clase.ambito:
                 metodo = clase.ambito.get_metodo(self.nombre_metodo)
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
@@ -700,11 +700,11 @@ class Igual(OperacionBinaria):
         tipo_der = self.derecha.cast
 
         tipos_basicos = ['Int', 'Bool', 'String']
-
-        if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
-            add_error(
-                f"{self.linea}: Illegal comparison with a basic type."
-            )
+        if tipo_izq != tipo_der:
+            if tipo_izq in tipos_basicos or tipo_der in tipos_basicos:
+                add_error(
+                    f"{self.linea}: Illegal comparison with a basic type."
+                )
 
         self.cast = 'Bool'
 
@@ -813,6 +813,7 @@ class String(Expresion):
         return resultado
     def Tipo(self, ambito):
         self.cast = 'String'
+        
     
 
 
@@ -852,6 +853,7 @@ class Programa(IterableNodo):
         Ambito.arbol_herencias = {}
 
         ambito = Ambito()
+        #TODO:Eliminar bucle
         for clase in CLASES_BASICAS:
             ambito_basic = ambito.entrar_ambito()
             ambito.set_ambito_clase(clase, ambito_basic)
@@ -935,18 +937,21 @@ class Clase(Nodo):
     
     def Tipo(self, ambito: Ambito):
         if self.padre != 'Object':
-            ambito_class = ambito.get_ambito_clase(self.padre)
+            ambito_padre = ambito.get_ambito_clase(self.padre)
         else:
-            ambito_class = ambito
-        if ambito_class is None:
+            ambito_padre = ambito
+
+        print("DEBUG: ", self.padre)
+        if ambito_padre is None:
             raise Exception(f"Clase padre {self.padre} no encontrada para la clase {self.nombre} en el fichero {self.nombre_fichero}")
-        self.ambito = Ambito(padre=ambito_class)
+        self.ambito = ambito.entrar_ambito()
         self.ambito.tipo_clase_actual = self.nombre
         for caracteristica in self.caracteristicas:
             if isinstance(caracteristica, Metodo):
                 self.ambito.add_metodo(caracteristica.nombre, caracteristica)
         ambito.set_ambito_clase(self.nombre, self.ambito)
-        
+        ambito.salir_ambito()
+
     def load(self):
         if self.ambito is not None:
             for caracteristica in self.caracteristicas:
