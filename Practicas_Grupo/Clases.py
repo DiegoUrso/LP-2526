@@ -3,10 +3,11 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from sympy import arg
+
 errores_sem = []
 
 CLASES_BASICAS = {"Object", "Int", "Bool", "String", "IO", "SELF_TYPE"}
-HERENCIAS_BASICAS = {} #clase:"Object" for clase in list(CLASES_BASICAS)}
 METODOS_BASICOS = {"abort", "type_name", "copy", "length"}
 
 
@@ -18,7 +19,7 @@ class Ambito:
     tipo_clase_actual: str = 'Object'
     ambitos: List['Ambito'] = []
     arbol_herencias: dict[str, 'Clase'] = {}
-    herencias_por_nombre: dict[str, str] = HERENCIAS_BASICAS.copy()
+    herencias_por_nombre: dict[str, str] = {}
     clases_por_nombre: dict[str, 'Clase'] = {}
     variables: dict[str, str] = field(default_factory=dict)
     metodos: dict[str, 'Metodo'] = {}
@@ -27,6 +28,7 @@ class Ambito:
         if isinstance(padre, Ambito):
             self.variables={}
             self.metodos=padre.metodos.copy()
+            self.clases=padre.clases.copy()
         else:
             self.variables = {}
             self.metodos = {}
@@ -100,7 +102,7 @@ class Ambito:
             return None
         
     def get_clase_por_nombre(self, clase_nombre: str):
-        print(f"DEBUG: Buscando clase {clase_nombre}")
+        #print(f"DEBUG: Buscando clase {clase_nombre}")
         if self.clases_por_nombre.__contains__(clase_nombre):
             return self.clases_por_nombre[clase_nombre]
         else:
@@ -135,6 +137,10 @@ class Ambito:
     def es_subtipo(self, tipo1: str, tipo2: str) -> bool:
         if tipo1 == "_no_type":
             return False
+        elif tipo1 == 'SELF_TYPE':
+            return self.es_subtipo(self.herencias_por_nombre[tipo1], tipo2)
+        elif tipo2 == 'SELF_TYPE':
+            return self.es_subtipo(tipo1, self.herencias_por_nombre[tipo2])
         elif tipo1 == tipo2 or self.mca(tipo1, tipo2) == tipo2:
             return True
         elif tipo1 == 'Object':
@@ -143,7 +149,7 @@ class Ambito:
             return False
 
     def mca(self, tipo1: str, tipo2: str) -> str:
-        print(f"DEBUG: Calculando mca de {tipo1} y {tipo2}")
+        #print(f"DEBUG: Calculando mca de {tipo1} y {tipo2}")
         lista_1 = [tipo1]
         current_elem = tipo1
         while current_elem != "Object":
@@ -154,10 +160,12 @@ class Ambito:
         while current_elem not in lista_1:
             current_elem = self.herencias_por_nombre[current_elem]
         
+        #print("RESULTADO DE: ", tipo1, tipo2, current_elem)
         return current_elem
 
     def entrar_ambito(self):
         nuevo_ambito = deepcopy(Ambito(padre=self))
+        nuevo_ambito.tipo_clase_actual = self.tipo_clase_actual
         self.ambitos.append(nuevo_ambito)
         return nuevo_ambito
 
@@ -269,7 +277,8 @@ class LlamadaMetodoEstatico(Expresion):
         for arg in self.argumentos:
             arg.Tipo(ambito)
         self.cuerpo.Tipo(ambito)
-        ambito_clase = ambito.get_ambito_clase(self.clase)
+        #ambito_clase = ambito.get_ambito_clase(self.clase)
+        ambito_clase = None
         if ambito.mca(self.cuerpo.cast, self.clase) != self.clase:
             add_error(
                 f"{self.linea}: Expression type {self.cuerpo.cast} does not conform to declared static dispatch type {self.clase}."
@@ -338,7 +347,7 @@ class LlamadaMetodo(Expresion):
             if clase and clase.ambito:
                 metodo = clase.ambito.get_metodo(self.nombre_metodo)
                 clase_nombre = Ambito.arbol_herencias.get(clase_nombre)
-                print("DEBUG: 1")
+                #print("DEBUG: 1")
                 if metodo not in clase.ambito.metodos.values():
                     add_error(
                         f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
@@ -346,7 +355,7 @@ class LlamadaMetodo(Expresion):
                 self.cast = "Object"
 
         if metodo is None:
-            print("DEBUG: 2")
+            #print("DEBUG: 2")
         #    add_error(
         #        f"{self.linea}: Dispatch to undefined method {self.nombre_metodo}."
         #    )
@@ -357,13 +366,23 @@ class LlamadaMetodo(Expresion):
             if len(metodo.formales) == len(self.argumentos) and not hasattr(self, "_checked_args"):
                 self._checked_args = True
                 for formal, arg in zip(metodo.formales, self.argumentos):
-                    print("DEBUG: tipo formal:", formal.tipo, "tipo arg:", arg.cast)
-                    if not ambito.es_subtipo(arg.cast, formal.tipo):
+                    #print("DEBUG: tipo formal:", formal.tipo, "tipo arg:", arg.cast)
+                    #TODO: APAÑO
+                    #print(ambito.tipo_clase_actual)
+                    #print(ambito.es_subtipo(formal.tipo, arg.cast))
+                    #print("DEBUG:", formal.tipo, arg.cast)
+                    #print("MCA:", ambito.mca(formal.tipo, arg.cast))
+
+                    if not ambito.es_subtipo( arg.cast, formal.tipo):
+                        #print("DEBUG:", formal.tipo, arg.cast)
                         add_error(
                             f"{self.linea}: In call of method {self.nombre_metodo}, "
                             f"type {arg.cast} of parameter {formal.nombre_variable} "
                             f"does not conform to declared type {formal.tipo}."
                         )
+                    if arg.cast == 'SELF_TYPE':
+                        #print(arg.cast, arg, ambito.tipo_clase_actual)
+                        arg.cast = ambito.tipo_clase_actual
 
             if metodo.tipo == 'SELF_TYPE':
                 self.cast = self.cuerpo.cast
@@ -903,8 +922,8 @@ class Programa(IterableNodo):
         for clase in self.secuencia:
             clase.Tipo(ambito)
         for clase in self.secuencia:
-            #The problem is very likely here that foreign ambitos are overwritten
-            clase.load()
+            ambito.tipo_clase_actual = clase.nombre
+            clase.load(ambito)
 
 @dataclass
 class Caracteristica(Nodo):
@@ -936,26 +955,38 @@ class Clase(Nodo):
         return resultado
     
     def Tipo(self, ambito: Ambito):
+        
         if self.padre != 'Object':
             ambito_padre = ambito.get_ambito_clase(self.padre)
         else:
             ambito_padre = ambito
 
-        print("DEBUG: ", self.padre)
+        #print("DEBUG: ", self.padre)
         if ambito_padre is None:
-            raise Exception(f"Clase padre {self.padre} no encontrada para la clase {self.nombre} en el fichero {self.nombre_fichero}")
-        self.ambito = ambito.entrar_ambito()
-        self.ambito.tipo_clase_actual = self.nombre
+            #raise Exception(f"Clase padre {self.padre} no encontrada para la clase {self.nombre} en el fichero {self.nombre_fichero}")
+            #Registrar padre definido más adelante.
+            ambito.herencias_por_nombre[self.nombre] = self.padre
+        ambito = ambito.entrar_ambito()
+        ambito.add_variable("self", 'SELF_TYPE')
+        ambito.tipo_clase_actual = self.nombre
+        #print(ambito.tipo_clase_actual)
+        self.ambito = ambito
+
         for caracteristica in self.caracteristicas:
+            #print()
             if isinstance(caracteristica, Metodo):
-                self.ambito.add_metodo(caracteristica.nombre, caracteristica)
-        ambito.set_ambito_clase(self.nombre, self.ambito)
+                ambito.add_metodo(caracteristica.nombre, caracteristica)
+        ambito.set_ambito_clase(self.nombre, ambito)
         ambito.salir_ambito()
 
-    def load(self):
-        if self.ambito is not None:
+        ambito.tipo_clase_actual = self.nombre
+
+    def load(self, ambito):
+        if ambito is not None:
+            #print("NOMBRE CLASE:", self.nombre, self.padre)
+            ambito.herencias_por_nombre["SELF_TYPE"] = self.nombre
             for caracteristica in self.caracteristicas:
-                caracteristica.Tipo(self.ambito)
+                caracteristica.Tipo(ambito)
 
 @dataclass
 class Metodo(Caracteristica):
@@ -1011,7 +1042,7 @@ class Atributo(Caracteristica):
         padre = ambito.padre
         while padre and padre.tipo_clase_actual not in CLASES_BASICAS:
             if self.nombre in padre.variables.keys():
-                print(f"DEBUG: padre {padre.tipo_clase_actual}, atributo {self.nombre}, tipo {self.tipo}")
+                #print(f"DEBUG: padre {padre.tipo_clase_actual}, atributo {self.nombre}, tipo {self.tipo}")
                 add_error(
                     f"{self.linea}: Attribute {self.nombre} is an attribute of an inherited class."
                 )
@@ -1019,5 +1050,5 @@ class Atributo(Caracteristica):
             padre = padre.padre
 
         self.cuerpo.Tipo(ambito)
-        print(f"DEBUG: Añadiendo variable {self.nombre} de tipo {self.tipo} a clase {ambito.tipo_clase_actual}")
+        #print(f"DEBUG: Añadiendo variable {self.nombre} de tipo {self.tipo} a clase {ambito.tipo_clase_actual}")
         ambito.add_variable(self.nombre, self.tipo)
