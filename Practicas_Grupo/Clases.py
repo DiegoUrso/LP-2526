@@ -3,8 +3,6 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from sympy import arg
-
 errores_sem = []
 
 CLASES_BASICAS = {"Object", "Int", "Bool", "String", "IO", "SELF_TYPE"}
@@ -23,6 +21,9 @@ class Ambito:
     clases_por_nombre: dict[str, 'Clase'] = {}
     variables: dict[str, str] = field(default_factory=dict)
     metodos: dict[str, 'Metodo'] = {}
+
+    def __repr__(self):
+        return f"Ambito(tipo_clase_actual={self.tipo_clase_actual})"
 
     def __init__(self, padre: Optional['Ambito'] = None):
         if isinstance(padre, Ambito):
@@ -924,6 +925,10 @@ class Programa(IterableNodo):
         for clase in self.secuencia:
             ambito.tipo_clase_actual = clase.nombre
             clase.load(ambito)
+
+        for clase in self.secuencia:
+            if clase.padre not in ambito.clases_por_nombre.keys():
+                add_error(f"{clase.linea}: Class {clase.nombre} inherits from an undefined class {clase.padre}.")
 
 @dataclass
 class Caracteristica(Nodo):
